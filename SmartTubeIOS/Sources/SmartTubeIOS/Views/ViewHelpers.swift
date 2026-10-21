@@ -127,6 +127,7 @@ enum AppSymbol {
     static let home = "house.fill"
     static let search = "magnifyingglass"
     static let library = "square.stack.fill"
+    static let channel = "person.crop.circle.fill"
     static let settings = "gearshape.fill"
 
     // MARK: - Navigation / chevrons

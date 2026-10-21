@@ -159,6 +159,7 @@ extension InnerTubeAPI {
         request.setValue(InnerTubeClients.TV.nameID, forHTTPHeaderField: "X-YouTube-Client-Name")
         request.setValue(InnerTubeClients.TV.version, forHTTPHeaderField: "X-YouTube-Client-Version")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        activeChannel.apply(to: &request)
         request.timeoutInterval = 8
         var clientFields = (tvClientContext["client"] as? [String: Any]) ?? [:]
         if let vd = visitorData { clientFields["visitorData"] = vd }
@@ -255,6 +256,7 @@ extension InnerTubeAPI {
         request.setValue(InnerTubeClients.iOS.nameID, forHTTPHeaderField: "X-YouTube-Client-Name")
         request.setValue(InnerTubeClients.iOS.version, forHTTPHeaderField: "X-YouTube-Client-Version")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        activeChannel.apply(to: &request)
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         let playerVideoId = body["videoId"] as? String ?? ""
         tubeLog.notice("POST /player (iOS, auth) videoId=\(playerVideoId, privacy: .public)")
@@ -454,6 +456,7 @@ extension InnerTubeAPI {
         request.setValue(InnerTubeClients.Web.version, forHTTPHeaderField: "X-YouTube-Client-Version")
         if let token = resolvedToken {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            activeChannel.apply(to: &request)
         }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         let authLabel = resolvedToken != nil ? "yes" : "no"
@@ -526,6 +529,7 @@ extension InnerTubeAPI {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             request.setValue("0", forHTTPHeaderField: "X-Goog-AuthUser")
         }
+        if sapisid != nil || authToken != nil { activeChannel.apply(to: &request) }
         let authStatus: String
         if sapisid != nil {
             authStatus = "SAPISIDHASH"
@@ -714,6 +718,7 @@ extension InnerTubeAPI {
         } else {
             authStatus = "unauthenticated"
         }
+        if authStatus != "unauthenticated" { activeChannel.apply(to: &request) }
         // Use the override visitor ID (from WKWebView guide call) when provided, so the
         // X-Goog-Visitor-Id header matches the context.client.visitorData in the body and
         // the minted BotGuard pot= token identifier — required for CDN URL validation.
@@ -772,6 +777,7 @@ extension InnerTubeAPI {
         // yt-dlp web OAuth pattern: Bearer + X-Goog-AuthUser:0 for www.youtube.com endpoints.
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("0", forHTTPHeaderField: "X-Goog-AuthUser")
+        activeChannel.apply(to: &request)
         if let vd = visitorData {
             request.setValue(vd, forHTTPHeaderField: "X-Goog-Visitor-Id")
         }
@@ -891,6 +897,7 @@ extension InnerTubeAPI {
         request.setValue(InnerTubeClients.TV.version, forHTTPHeaderField: "X-YouTube-Client-Version")
         if let token = resolvedToken {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            activeChannel.apply(to: &request)
         }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         let authLabel = shouldAuthenticate ? "yes" : "no"

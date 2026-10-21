@@ -104,6 +104,7 @@ enum AppSection: String, CaseIterable, Identifiable {
     case home = "Home"
     case search = "Search"
     case library = "Library"
+    case channel = "Channel"
     case settings = "Settings"
 
     var id: String { rawValue }
@@ -113,6 +114,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .home: return AppSymbol.home
         case .search: return AppSymbol.search
         case .library: return AppSymbol.library
+        case .channel: return AppSymbol.channel
         case .settings: return AppSymbol.settings
         }
     }
@@ -123,6 +125,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .home: HomeView(api: api)
         case .search: SearchView()
         case .library: LibraryView()
+        case .channel: ChannelSwitcherView()
         case .settings: SettingsView()
         }
     }

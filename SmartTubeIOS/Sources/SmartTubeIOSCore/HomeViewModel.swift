@@ -175,6 +175,13 @@ public final class HomeViewModel {
                     self.removeChannel(id: channelId)
                 }
             })
+        hideObserverTasks.append(
+            Task { [weak self] in
+                for await _ in NotificationCenter.default.notifications(named: .activeChannelDidChange) {
+                    guard let self, self.hasAuthToken else { continue }
+                    self.load()
+                }
+            })
     }
 
     public func removeVideo(id: String) {
