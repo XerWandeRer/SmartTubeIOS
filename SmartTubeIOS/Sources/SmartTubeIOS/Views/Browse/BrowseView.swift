@@ -272,8 +272,9 @@ struct VideoGridSection: View {
             .focusSection()
             #endif
             #else
+            let columns = videoGridColumns(store.settings, landscape: isLandscapeLayout)
             LazyVGrid(
-                columns: videoGridColumns(store.settings, landscape: isLandscapeLayout), spacing: videoGridRowSpacing
+                columns: columns, spacing: videoGridRowSpacing
             ) {
                 ForEach(videos) { video in
                     VideoCardView(video: video, compact: false)
@@ -285,6 +286,7 @@ struct VideoGridSection: View {
                         }
                 }
             }
+            .environment(\.reservesTitleSpace, columns.count > 1)
             // Column count now follows isLandscapeLayout (set by a later layout pass than the
             // orientation notification, and also on iPad split-screen resizes), so reset the
             // grid's identity on that too — a column change without an identity reset is the
