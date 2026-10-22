@@ -36,6 +36,7 @@ public struct VideoCardView: View {
     @Environment(AuthService.self) private var authService
     @Environment(SettingsStore.self) private var store
     @Environment(\.innerTubeAPI) private var api
+    @Environment(\.reservesTitleSpace) private var reservesTitleSpace
     #if os(iOS)
     @Environment(PlayerRouter.self) private var playerRouter
     #endif
@@ -448,7 +449,7 @@ public struct VideoCardView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(displayTitle)
                     .font(.subheadline.weight(.medium))
-                    .lineLimit(2, reservesSpace: true)
+                    .lineLimit(2, reservesSpace: reservesTitleSpace)
                     .accessibilityIdentifier("video.card.title")
                 Text(video.channelTitle)
                     .font(.caption)

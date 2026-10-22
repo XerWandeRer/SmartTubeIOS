@@ -57,6 +57,20 @@ extension EnvironmentValues {
     }
 }
 
+// MARK: - Video grid title layout
+
+private struct ReservesTitleSpaceKey: EnvironmentKey {
+    static let defaultValue = true
+}
+
+extension EnvironmentValues {
+    /// Multi-column grids reserve two title lines to keep card metadata aligned.
+    var reservesTitleSpace: Bool {
+        get { self[ReservesTitleSpaceKey.self] }
+        set { self[ReservesTitleSpaceKey.self] = newValue }
+    }
+}
+
 // MARK: - Accent color
 
 extension AppSettings.AccentColorChoice {
