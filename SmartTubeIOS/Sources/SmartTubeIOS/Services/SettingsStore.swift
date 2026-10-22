@@ -32,7 +32,7 @@ public final class SettingsStore {
     /// mini player, PIP, DASH switching, etc.) opt out via
     /// `--uitesting-disable-tos-player-on-ios`. Has no effect on macOS or tvOS —
     /// PlayerRouter (the only reader) is `#if os(iOS)`.
-    public var useTOSPlayerOnIOS: Bool = true
+    public var useTOSPlayerOnIOS: Bool = false
 
     private static let key = "smarttube_app_settings"
 

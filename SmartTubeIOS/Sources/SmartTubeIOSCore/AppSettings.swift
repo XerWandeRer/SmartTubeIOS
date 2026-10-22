@@ -277,7 +277,7 @@ public struct AppSettings: Codable {
         hideWatchedVideos = false
         hideWatchedThreshold = 0.9
         disableLiquidGlass = false
-        disableAnalytics = false
+        disableAnalytics = true
         settingsPINHash = nil
         hideShorts = false
         hideLiveShorts = false
