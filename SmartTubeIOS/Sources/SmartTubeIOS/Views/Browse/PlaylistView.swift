@@ -181,8 +181,9 @@ public struct PlaylistView: View {
                 .padding(.horizontal)
                 .padding(.vertical, 8)
                 #else
+                let columns = videoGridColumns(store.settings, landscape: isLandscapeLayout)
                 LazyVGrid(
-                    columns: videoGridColumns(store.settings, landscape: isLandscapeLayout),
+                    columns: columns,
                     spacing: videoGridRowSpacing
                 ) {
                     ForEach(displayVideos) { video in
@@ -211,6 +212,7 @@ public struct PlaylistView: View {
                             .onAppear { vm.loadMoreIfNeeded(lastVideo: video) }
                     }
                 }
+                .environment(\.reservesTitleSpace, columns.count > 1)
                 .id(isLandscapeLayout)  // reset on column-count change — see VideoGridSection (#82)
                 .padding(.horizontal)
                 .padding(.vertical, 8)
