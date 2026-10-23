@@ -106,6 +106,42 @@ public final class PlayerStateStore {
         let hostView = PersistentPlayerHostView()
         hostView.playerLayer.player = vm.player
         self.playerHostView = hostView
+        vm.onSystemBackgroundPause = { [weak self] in self?.detachVideoLayerForBackground() }
+        didBecomeActiveObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.handleAppDidBecomeActive() }
+        }
+    }
+
+    @ObservationIgnored nonisolated(unsafe) private var didBecomeActiveObserver: Any?
+
+    deinit {
+        if let obs = didBecomeActiveObserver { NotificationCenter.default.removeObserver(obs) }
+    }
+
+    // MARK: - Background playback
+
+    /// Detaches the player from the video layer so iOS keeps playing audio in the
+    /// background. Skipped while PiP is showing the layer.
+    private func detachVideoLayerForBackground() {
+        guard !vm.isPictureInPictureActive, playerHostView.playerLayer.player != nil else { return }
+        playerHostView.playerLayer.player = nil
+        storeLog.notice("[background] video layer detached")
+    }
+
+    private func reattachVideoLayer() {
+        guard playerHostView.playerLayer.player == nil else { return }
+        playerHostView.playerLayer.player = vm.player
+        storeLog.notice("[background] video layer reattached")
+    }
+
+    /// Returning to the app (unlock, app icon, app switcher) brings the video back
+    /// into the player.
+    private func handleAppDidBecomeActive() {
+        reattachVideoLayer()
     }
 
     // MARK: - Actions

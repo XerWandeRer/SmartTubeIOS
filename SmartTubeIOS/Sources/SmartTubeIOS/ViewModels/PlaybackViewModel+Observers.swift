@@ -45,10 +45,20 @@ extension PlaybackViewModel {
         // pauses the player (e.g. headphones removed, audio session interruption ends
         // without shouldResume). Without this, isPlaying stays true while the player
         // is actually silent, causing handleForeground() to re-start a ghost session.
-        rateObserver = player.observe(\.rate, options: [.new]) { [weak self] _, change in
-            guard let self, let newRate = change.newValue else { return }
+        //
+        // Uses AVPlayer.rateDidChangeNotification rather than KVO so the handler sees
+        // *why* the rate changed: the system pausing a backgrounded app is not a stall.
+        removeRateObserver()
+        rateObserver = NotificationCenter.default.addObserver(
+            forName: AVPlayer.rateDidChangeNotification,
+            object: player,
+            queue: .main
+        ) { [weak self] notification in
+            let reason = notification.userInfo?[AVPlayer.rateDidChangeReasonKey] as? AVPlayer.RateDidChangeReason
             Task { @MainActor [weak self] in
                 guard let self else { return }
+                let newRate = self.player.rate
+                if self.handleNonStallRateChange(newRate: newRate, reason: reason) { return }
                 // Ignore rate changes that we ourselves triggered (load/pause/resume/stop)
                 // by only acting when the player goes silent unexpectedly while we
                 // believed it was playing.
@@ -149,6 +159,32 @@ extension PlaybackViewModel {
                 }
             }
         }
+    }
+
+    func removeRateObserver() {
+        if let obs = rateObserver { NotificationCenter.default.removeObserver(obs) }
+        rateObserver = nil
+    }
+
+    /// Handles rate changes that are not playback stalls. Returns true when the
+    /// change was consumed and the stall-recovery path must not run.
+    private func handleNonStallRateChange(newRate: Float, reason: AVPlayer.RateDidChangeReason?) -> Bool {
+        if newRate == 0 && isPlaying {
+            playerLog.notice(
+                "[rateObserver] rate→0 reason=\(reason?.rawValue ?? "nil") pip=\(self.isPictureInPictureActive)")
+        }
+        #if os(iOS)
+        // iOS pauses a player that is still attached to a visible AVPlayerLayer when
+        // the app goes to the background (screen lock, home without PiP). With
+        // background playback on, detach the video layer and keep playing audio.
+        if newRate == 0, isPlaying, reason == .appBackgrounded, settings.backgroundPlaybackEnabled {
+            onSystemBackgroundPause?()
+            player.rate = Float(settings.playbackSpeed)
+            playerLog.notice("[rateObserver] system paused on backgrounding — resumed for background playback")
+            return true
+        }
+        #endif
+        return false
     }
 
     #if canImport(UIKit)
