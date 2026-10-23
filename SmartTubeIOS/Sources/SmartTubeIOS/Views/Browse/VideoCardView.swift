@@ -43,8 +43,6 @@ public struct VideoCardView: View {
     @State private var localProgress: Double?
     @State private var watchLaterAlert: DownloadAlertItem?
     @State private var playlistPickerMode: PlaylistPickerSheet.Mode?
-    /// Index into `video.thumbnailFallbackURLs`. -1 = use primary `thumbnailURL`.
-    @State private var thumbnailFallbackIndex: Int = -1
     #if !os(tvOS)
     #if ENABLE_DOWNLOADS
     @Environment(VideoDownloadService.self) private var downloadService
@@ -553,13 +551,13 @@ public struct VideoCardView: View {
         if video.thumbnailURL == nil, video.id == "WL" || video.id == "LL" {
             systemPlaylistThumbnail
         } else {
-            // Walk a fallback chain on each successive failure:
-            //   -1 → deArrowThumbnailURL (community thumbnail), else maxresdefault.jpg when
-            //        High Resolution is on, else thumbnailURL (API-provided)
-            //    (High Resolution only: hq720.jpg, then the standard chain below)
-            //    0 → sddefault.jpg  (640×480, available for most videos)
-            //    1 → hqdefault.jpg  (480×360, always available)
-            //    2 → mqdefault.jpg  (320×180, always available — last resort)
+            // Candidates, first that loads wins (ThumbnailImage treats HTTP 404 as a miss):
+            //   deArrowThumbnailURL (community thumbnail), else maxresdefault.jpg when
+            //   High Resolution is on, else thumbnailURL (API-provided)
+            //   (High Resolution only: hq720.jpg, then the standard chain below)
+            //   sddefault.jpg  (640×480, available for most videos)
+            //   hqdefault.jpg  (480×360, always available)
+            //   mqdefault.jpg  (320×180, always available — last resort)
             // High-res URLs are built from `/vi/<id>/`, so they only make sense for real
             // videos: playlist placeholder cards (Playlists section: id == playlistId) would
             // walk the whole chain against a playlist ID and end on a grey placeholder, and
@@ -567,29 +565,17 @@ public struct VideoCardView: View {
             let highRes =
                 store.settings.highResThumbnails && video.playlistId != video.id && !video.isShort
             let fallbacks = highRes ? video.highResThumbnailFallbackURLs : video.thumbnailFallbackURLs
-            let url: URL? =
-                thumbnailFallbackIndex < 0
-                ? (deArrowThumbnailURL ?? (highRes ? video.maxResThumbnailURL : video.thumbnailURL) ?? fallbacks.first)
-                : (thumbnailFallbackIndex < fallbacks.count ? fallbacks[thumbnailFallbackIndex] : nil)
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .success(let img):
-                    img.resizable().scaledToFill()
-                case .failure:
-                    let nextIndex = thumbnailFallbackIndex + 1
-                    if nextIndex < fallbacks.count {
-                        placeholderThumbnail
-                            .onAppear { thumbnailFallbackIndex = nextIndex }
-                    } else {
-                        placeholderThumbnail
-                    }
-                default:
+            let primary = deArrowThumbnailURL ?? (highRes ? video.maxResThumbnailURL : video.thumbnailURL)
+            ThumbnailImage(urls: [primary].compactMap { $0 } + fallbacks) { img in
+                img.resizable().scaledToFill()
+            } placeholder: { isLoading in
+                if isLoading {
                     placeholderThumbnail.overlay(ProgressView())
+                } else {
+                    placeholderThumbnail
                 }
             }
             .task(id: video.id) {
-                // Reset so a reused card slot always tries the primary URL for the new video.
-                thumbnailFallbackIndex = -1
                 #if canImport(WebKit)
                 await BotGuardWebViewRunner.shared.prepare()
                 #if !os(iOS)
