@@ -94,11 +94,11 @@ public final class PlayerOrientationController {
         apply(reason: "decoded size")
     }
 
-    func setLandscapeLocked(_ locked: Bool) {
-        guard policy.isLandscapeLocked != locked else { return }
-        policy.isLandscapeLocked = locked
+    /// The player's orientation button: flips portrait/landscape for the current video.
+    func toggleOrientation() {
         guard isPresented else { return }
-        apply(reason: "landscape lock=\(locked)")
+        policy.toggleManually()
+        apply(reason: "manual toggle")
     }
 
     private func appDidBecomeActive() {
@@ -116,7 +116,6 @@ public final class PlayerOrientationController {
     func playerDismissed() {
         guard isPresented else { return }
         isPresented = false
-        policy.end()
         let rotateBack = forcedLandscape
         forcedLandscape = false
         orientationLog.notice("[PlayerOrientation] dismissed — rotateBackToPortrait=\(rotateBack)")

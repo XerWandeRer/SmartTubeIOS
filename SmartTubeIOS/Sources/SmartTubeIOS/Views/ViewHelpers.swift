@@ -166,6 +166,8 @@ enum AppSymbol {
     static let download = "arrow.down.to.line"
     static let watchLater = "clock.badge"
     static let audioOnly = "waveform.circle"
+    static let rotateToPortrait = "rectangle.portrait.rotate"
+    static let rotateToLandscape = "rectangle.landscape.rotate"
 
     // MARK: - Status / info
     static let warning = "exclamationmark.triangle.fill"

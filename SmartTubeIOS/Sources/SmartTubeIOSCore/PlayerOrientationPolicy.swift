@@ -5,25 +5,32 @@ import Foundation
 ///
 /// The first guess comes from `Video.isShort`. Once the player reports the decoded
 /// size, `confirmAspect` replaces the guess — once per video, so later quality
-/// switches cannot flip the orientation mid-playback. The landscape lock overrides
-/// both while the player stays open.
+/// switches cannot flip the orientation mid-playback. A manual toggle overrides
+/// both for the current video only.
 public struct PlayerOrientationPolicy: Equatable, Sendable {
     public private(set) var videoID: String?
     public private(set) var videoIsLandscape = true
     public private(set) var isAspectConfirmed = false
-    public var isLandscapeLocked = false
+    /// Set by the manual orientation toggle; cleared when another video begins.
+    public private(set) var manualLandscape: Bool?
 
     public init() {}
 
-    public var wantsLandscape: Bool { isLandscapeLocked || videoIsLandscape }
+    public var wantsLandscape: Bool { manualLandscape ?? videoIsLandscape }
 
     /// Starts tracking `videoID`. Re-entering the same video (e.g. expanding the
-    /// mini player) keeps the size already confirmed for it.
+    /// mini player) keeps the size already confirmed for it and the manual choice.
     public mutating func begin(videoID: String, isShort: Bool) {
         guard videoID != self.videoID else { return }
         self.videoID = videoID
         videoIsLandscape = !isShort
         isAspectConfirmed = false
+        manualLandscape = nil
+    }
+
+    /// Flips the current orientation for this video.
+    public mutating func toggleManually() {
+        manualLandscape = !wantsLandscape
     }
 
     /// Applies the decoded size of `videoID`. Returns `true` when this changed
@@ -36,11 +43,5 @@ public struct PlayerOrientationPolicy: Equatable, Sendable {
         let landscape = width >= height
         defer { videoIsLandscape = landscape }
         return landscape != videoIsLandscape
-    }
-
-    /// Forgets the lock when the player closes. The video and its confirmed size
-    /// are kept so reopening the same video does not need to guess again.
-    public mutating func end() {
-        isLandscapeLocked = false
     }
 }

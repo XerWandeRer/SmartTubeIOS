@@ -48,7 +48,6 @@ public struct PlayerView: View {
     @State var downloadAlertItem: DownloadAlertItem?
     #endif
     #if os(iOS)
-    @State var isLandscapeLocked = false
     var playerLayer: AVPlayerLayer { playerState.playerHostView.playerLayer }
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
     @Environment(\.verticalSizeClass) var verticalSizeClass
