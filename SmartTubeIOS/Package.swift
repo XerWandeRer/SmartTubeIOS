@@ -53,6 +53,7 @@ let package = Package(
             name: "SmartTubeIOSTests",
             dependencies: ["SmartTubeIOSCore", "SmartTubeIOS"],
             path: "Tests/SmartTubeIOSTests",
+            resources: [.copy("Fixtures")],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
     ]

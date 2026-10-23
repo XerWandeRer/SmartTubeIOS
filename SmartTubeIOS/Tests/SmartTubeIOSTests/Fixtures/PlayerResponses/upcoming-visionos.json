@@ -1,0 +1,84 @@
+{
+  "playabilityStatus" : {
+    "liveStreamability" : {
+      "liveStreamabilityRenderer" : {
+        "broadcastId" : "1",
+        "offlineSlate" : {
+          "liveStreamOfflineSlateRenderer" : {
+            "mainText" : {
+              "runs" : [
+                {
+                  "text" : "Live in "
+                },
+                {
+                  "text" : "6 days"
+                }
+              ]
+            },
+            "offlineSlateStyle" : "OFFLINE_SLATE_STYLE_ABSTRACT",
+            "scheduledStartTime" : "1793270700",
+            "subtitleText" : {
+              "runs" : [
+                {
+                  "text" : "October 29 at 6:45 AM GMT-4"
+                }
+              ]
+            },
+            "thumbnail" : {
+              "thumbnails" : [
+                {
+                  "height" : 180,
+                  "url" : "https:\/\/i.ytimg.com\/vi\/hv867HnY4j4\/mqdefault.jpg?v=6ad79cb0",
+                  "width" : 320
+                },
+                {
+                  "height" : 720,
+                  "url" : "https:\/\/i.ytimg.com\/vi\/hv867HnY4j4\/hq720.jpg?v=6ad79cb0",
+                  "width" : 1280
+                }
+              ]
+            }
+          }
+        },
+        "pollDelayMs" : "15000",
+        "videoId" : "hv867HnY4j4"
+      }
+    },
+    "playableInEmbed" : true,
+    "reason" : "This live event will begin in 6 days.",
+    "status" : "LIVE_STREAM_OFFLINE"
+  },
+  "videoDetails" : {
+    "allowRatings" : true,
+    "author" : "NASA",
+    "channelId" : "UCLA_DiR1FfKNvjuUpBHmylQ",
+    "isCrawlable" : true,
+    "isLiveContent" : true,
+    "isLowLatencyLiveStream" : false,
+    "isOwnerViewing" : false,
+    "isPrivate" : false,
+    "isTvfilmVideo" : false,
+    "isUnpluggedCorpus" : false,
+    "isUpcoming" : true,
+    "latencyClass" : "MDE_STREAM_OPTIMIZATIONS_RENDERER_LATENCY_NORMAL",
+    "lengthSeconds" : "0",
+    "shortDescription" : "Join us for a spacewalk milestone!\n\nNASA astronaut Anil Menon and CSA (Canadian Space Agency) astronaut Joshua Kutryk are participating in the 100th spacewalk conducted from the International Space Station's Quest airlock without the space shuttle present. This will be the 285th spacewalk conducted to build, maintain, and upgrade the orbiting laboratory.\n\nMenon and Kutryk are expected to begin their spacewalk at about 8:10 a.m. EDT (1210 UTC); they'll be installing a new International Space Station Roll-Out Solar Array (IROSA), which will boost the station's power.\n\nLearn more about today's spacewalk: https:\/\/go.nasa.gov\/4yRBm97\nGet daily updates from the space station: https:\/\/www.nasa.gov\/blogs\/spacestation\/",
+    "thumbnail" : {
+      "thumbnails" : [
+        {
+          "height" : 180,
+          "url" : "https:\/\/i.ytimg.com\/vi\/hv867HnY4j4\/mqdefault.jpg?v=6ad79cb0",
+          "width" : 320
+        },
+        {
+          "height" : 720,
+          "url" : "https:\/\/i.ytimg.com\/vi\/hv867HnY4j4\/hq720.jpg?v=6ad79cb0",
+          "width" : 1280
+        }
+      ]
+    },
+    "title" : "U.S. Spacewalk 100",
+    "videoId" : "hv867HnY4j4",
+    "viewCount" : "0"
+  }
+}

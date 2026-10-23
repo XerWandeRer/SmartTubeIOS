@@ -623,7 +623,9 @@ extension InnerTubeAPI {
 
     // MARK: - Private player helpers
 
-    private func parsePlayerInfo(from json: [String: Any], videoId: String) throws -> PlayerInfo {
+    /// Internal (not private) so offline fixture tests can feed recorded responses.
+    func parsePlayerInfo(from json: [String: Any], videoId: String) throws -> PlayerInfo {
+        PlayerResponseRecorder.record(json, videoId: videoId)
         let videoDetails = json["videoDetails"] as? [String: Any]
         let title = videoDetails?["title"] as? String ?? ""
         let channelTitle = videoDetails?["author"] as? String ?? ""

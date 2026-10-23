@@ -1,0 +1,56 @@
+{
+  "playabilityStatus" : {
+    "desktopLegacyAgeGateReason" : 1,
+    "reason" : "Sign in to confirm your age",
+    "status" : "LOGIN_REQUIRED"
+  },
+  "videoDetails" : {
+    "allowRatings" : true,
+    "author" : "The Witcher",
+    "channelId" : "UCzybXLxv08IApdjdN0mJhEg",
+    "isCrawlable" : true,
+    "isLiveContent" : false,
+    "isOwnerViewing" : false,
+    "isPrivate" : false,
+    "isTvfilmVideo" : false,
+    "isUnpluggedCorpus" : false,
+    "keywords" : [
+      "RPG",
+      "E3 2014",
+      "e3",
+      "Gameplay Trailer",
+      "witcher",
+      "the witcher",
+      "the witcher 3",
+      "e3 trailer",
+      "e3 2014 trailer",
+      "witcher 3 e3 trailer",
+      "witcher 3 e3",
+      "witcher e3",
+      "sword of destiny",
+      "wild hunt",
+      "thewitcher",
+      "trailer",
+      "gameplay trailer"
+    ],
+    "lengthSeconds" : "142",
+    "shortDescription" : "For more information visit:\nBuy now: http:\/\/buy.thewitcher.com\nFacebook: https:\/\/www.fb.com\/thewitcher\nTwitter: https:\/\/twitter.com\/witchergame\nHomepage: http:\/\/thewitcher.com\/witcher3\/\n\nThe game is scheduled to launch May 19, 2015 and will be available on Xbox One, PC and PlayStation®4.\n\nAbout the Game\n\nThe Witcher 3: Wild Hunt is a story-driven, next-generation open world role-playing game, set in a fantasy universe full of meaningful choices and impactful consequences. In The Witcher 3, you play as Geralt of Rivia, one of a dying caste of monster hunters, and embark on an epic journey in a war-ravaged world that will inevitably lead you to confront a foe darker than anything humanity has faced so far—the Wild Hunt.\n\n--------------------------------------------------------------------------------------\nMusic from Sword of Destiny trailer : http:\/\/bit.ly\/1lbwCNX\nCollector's Edition UNBOXING [Official] : http:\/\/bit.ly\/1nX9Scu",
+    "thumbnail" : {
+      "thumbnails" : [
+        {
+          "height" : 180,
+          "url" : "https:\/\/i.ytimg.com\/vi\/HtVdAasjOgU\/mqdefault.jpg",
+          "width" : 320
+        },
+        {
+          "height" : 720,
+          "url" : "https:\/\/i.ytimg.com\/vi\/HtVdAasjOgU\/hq720.jpg",
+          "width" : 1280
+        }
+      ]
+    },
+    "title" : "The Witcher 3: Wild Hunt - The Sword Of Destiny Trailer",
+    "videoId" : "HtVdAasjOgU",
+    "viewCount" : "5782222"
+  }
+}
