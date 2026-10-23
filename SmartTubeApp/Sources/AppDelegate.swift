@@ -9,7 +9,7 @@ private let appDelegateLog = Logger(subsystem: "com.void.smarttube.app", categor
 /// orientation-change event. Returns `.allButUpsideDown` so that
 /// `UIWindowScene.requestGeometryUpdate` can successfully request landscape
 /// when the player opens and portrait when it closes. Proactive
-/// portrait↔landscape transitions are managed by `OrientationManager`.
+/// portrait↔landscape transitions are managed by `PlayerOrientationController`.
 @MainActor
 final class AppDelegate: NSObject, UIApplicationDelegate {
     func application(
@@ -21,13 +21,13 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         //    restrict to portrait-only while the full-screen player cover is
         //    being presented (PresentationHostingController caches the supported
         //    mask at creation time, before PlayerView.onAppear fires).
-        // 2. OrientationManager.requestGeometryUpdate can successfully request
+        // 2. PlayerOrientationController can successfully request
         //    landscape when the player opens and portrait when it closes.
         // Proactive portrait↔landscape transitions are still managed by
-        // OrientationManager via UIWindowScene.requestGeometryUpdate.
+        // PlayerOrientationController via UIWindowScene.requestGeometryUpdate.
         let mask = UIInterfaceOrientationMask.allButUpsideDown
         appDelegateLog.notice(
-            "[AppDelegate] supportedInterfaceOrientationsFor — returning mask=\(mask.rawValue) playerIsActive=\(OrientationManager.shared.playerIsActive)"
+            "[AppDelegate] supportedInterfaceOrientationsFor — returning mask=\(mask.rawValue)"
         )
         return mask
     }

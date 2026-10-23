@@ -11,7 +11,8 @@ public struct AppSettings: Codable {
     public var autoplayEnabled: Bool
     public var subtitlesLanguage: String?
     public var backgroundPlaybackEnabled: Bool
-    /// When `true`, the player automatically rotates to landscape when a video starts on iPhone.
+    /// Legacy "always play in landscape" switch. No longer read: the player orientation
+    /// follows the video (`PlayerOrientationPolicy`). Kept so stored settings still decode.
     public var landscapeAlwaysPlay: Bool
     /// When `true`, Picture-in-Picture is available and the PiP button is shown in the player.
     public var pipEnabled: Bool

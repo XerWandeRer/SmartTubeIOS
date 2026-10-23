@@ -391,10 +391,6 @@ public struct TOSPlayerView: View {
                 // in showControls() then fades them out. Subsequent reveals happen via
                 // the embedded player's surface-tap message or on videoId change.
                 showControls()
-                UIDevice.current.beginGeneratingDeviceOrientationNotifications()
-                let physicallyLandscape = UIDevice.current.orientation.isLandscape
-                OrientationManager.shared.playerIsActive =
-                    isLandscapeLocked || store.settings.landscapeAlwaysPlay || physicallyLandscape
                 #endif
             }
             // Pause the embedded <video> element when this view leaves the hierarchy.
@@ -415,8 +411,6 @@ public struct TOSPlayerView: View {
             .onDisappear {
                 #if os(iOS)
                 controlsHideTask?.cancel()
-                UIDevice.current.endGeneratingDeviceOrientationNotifications()
-                OrientationManager.shared.playerIsActive = false
                 // On iOS, only pause when fully stopped — not when minimizing to mini-player.
                 // TOSPlayerStateStore.stop() already calls vm.pause() + vm.saveProgress()
                 // before releasing the vm, so we only log here in that case.
@@ -493,20 +487,10 @@ public struct TOSPlayerView: View {
             // (tosState.vm is replaced by TOSPlayerStateStore.play). Without this the
             // controls stay hidden if the user swiped while they were already hidden.
             .onChange(of: vm.videoId) { _, _ in showControls() }
-            // Keep landscape advertised to UIKit in sync with physical rotation, the
-            // shared "Landscape Always Play" setting, and the lock button — mirrors
-            // PlayerView+Lifecycle.swift's identical orientation-sync modifiers.
-            .onReceive(NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification)) { _ in
-                let orientation = UIDevice.current.orientation
-                guard orientation.isValidInterfaceOrientation else { return }
-                OrientationManager.shared.playerIsActive =
-                    isLandscapeLocked || store.settings.landscapeAlwaysPlay || orientation.isLandscape
-            }
-            .onChange(of: store.settings.landscapeAlwaysPlay) { _, alwaysLandscape in
-                OrientationManager.shared.playerIsActive = isLandscapeLocked || alwaysLandscape
-            }
+            // Orientation follows the video (see PlayerOrientationController); the lock
+            // button forces landscape for portrait videos.
             .onChange(of: isLandscapeLocked) { _, isLocked in
-                OrientationManager.shared.playerIsActive = isLocked || store.settings.landscapeAlwaysPlay
+                PlayerOrientationController.shared.setLandscapeLocked(isLocked)
             }
             .onChange(of: scenePhase) { _, phase in
                 guard phase == .active else { return }
