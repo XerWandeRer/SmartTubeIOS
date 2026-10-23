@@ -24,8 +24,6 @@ struct PlayerControlsOverlay: View {
     @Binding var channelDestination: ChannelDestination?
 
     #if os(iOS)
-    @Binding var pipController: AVPictureInPictureController?
-    @Binding var isPiPActive: Bool
     @Binding var isLandscapeLocked: Bool
     @Environment(PlayerStateStore.self) private var playerState
     var vm: PlaybackViewModel { playerState.vm }
@@ -130,7 +128,8 @@ struct PlayerControlsOverlay: View {
                 Spacer()
                 #if os(iOS)
                 // Picture-in-Picture button — shown when PiP is enabled in settings and supported on this device
-                if store.settings.pipEnabled, let pip = pipController {
+                if store.settings.pipEnabled, let pip = playerState.pipController {
+                    let isPiPActive = vm.isPictureInPictureActive
                     Button {
                         if isPiPActive {
                             pip.stopPictureInPicture()
