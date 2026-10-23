@@ -540,3 +540,79 @@ final class PlayerAndMiniPlayerUITests: XCTestCase {
     }
     #endif
 }
+
+// MARK: - Tests (YouTube-style mini player, XER-12)
+// In an extension to keep the class body under SwiftLint's type_body_length.
+
+extension PlayerAndMiniPlayerUITests {
+    /// Opens a video, minimizes it and waits for the mini player bar.
+    private func showMiniPlayer() throws {
+        try openPlayerFromHome()
+        minimizePlayer()
+        guard miniPlayerBar.waitForExistence(timeout: 5) else {
+            try captureAndSkip("miniPlayer.bar not found — mini-player may not be active in this environment", in: app)
+        }
+    }
+
+    /// Drags from the title area of the mini player (clear of the buttons) by the given offset.
+    /// `slow` drags slowly and holds before lifting, so the release carries no fling velocity.
+    private func dragMiniPlayer(dx: CGFloat, dy: CGFloat, slow: Bool = false) {
+        let start = miniPlayerBar.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.5))
+        let end = start.withOffset(CGVector(dx: dx, dy: dy))
+        if slow {
+            start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.5)
+        } else {
+            start.press(forDuration: 0.05, thenDragTo: end)
+        }
+    }
+
+    private func waitForMiniPlayerToDisappear() -> Bool {
+        let gone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: miniPlayerBar)
+        return XCTWaiter().wait(for: [gone], timeout: 3) == .completed
+    }
+
+    func testMiniPlayerShowsProgressBarAndNextButton() throws {
+        try XCTSkipIf(Self.skipAllTests, Self.skipReason)
+        try showMiniPlayer()
+        XCTAssertTrue(
+            app.otherElements["miniPlayer.progressBar"].firstMatch.exists,
+            "miniPlayer.progressBar should be shown on top of the mini player")
+        XCTAssertTrue(
+            app.buttons["miniPlayer.nextButton"].firstMatch.exists,
+            "miniPlayer.nextButton should be shown in the mini player")
+    }
+
+    func testSwipeUpOnMiniPlayerExpandsToFullScreen() throws {
+        try XCTSkipIf(Self.skipAllTests, Self.skipReason)
+        try showMiniPlayer()
+        dragMiniPlayer(dx: 0, dy: -120)
+        XCTAssertTrue(
+            playerTitle.waitForExistence(timeout: 5),
+            "player.titleLabel should reappear after swiping the mini player up")
+    }
+
+    func testSwipeLeftOnMiniPlayerCloses() throws {
+        try XCTSkipIf(Self.skipAllTests, Self.skipReason)
+        try showMiniPlayer()
+        dragMiniPlayer(dx: -250, dy: 0)
+        XCTAssertTrue(waitForMiniPlayerToDisappear(), "miniPlayer.bar should disappear after swiping left")
+        XCTAssertFalse(playerTitle.exists, "Swiping the mini player away must not expand the player")
+    }
+
+    func testSwipeDownOnMiniPlayerCloses() throws {
+        try XCTSkipIf(Self.skipAllTests, Self.skipReason)
+        try showMiniPlayer()
+        dragMiniPlayer(dx: 0, dy: 120)
+        XCTAssertTrue(waitForMiniPlayerToDisappear(), "miniPlayer.bar should disappear after swiping down")
+        XCTAssertFalse(playerTitle.exists, "Swiping the mini player away must not expand the player")
+    }
+
+    func testShortDragOnMiniPlayerSnapsBack() throws {
+        try XCTSkipIf(Self.skipAllTests, Self.skipReason)
+        try showMiniPlayer()
+        dragMiniPlayer(dx: 40, dy: 0, slow: true)
+        XCTAssertFalse(
+            waitForMiniPlayerToDisappear(), "A short drag below the threshold must not close the mini player")
+        XCTAssertFalse(playerTitle.exists, "A short sideways drag must not expand the player")
+    }
+}
