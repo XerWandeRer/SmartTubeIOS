@@ -3,7 +3,7 @@ import XCTest
 // MARK: - OrientationCrashRegressionUITests
 //
 // Regression test for Crashlytics issue 1bce7ef11c47da56fe887213f0d7a652:
-// EXC_BREAKPOINT in OrientationManager.requestGeometryUpdate(_:) error handler.
+// EXC_BREAKPOINT in the requestGeometryUpdate(_:) error handler (now in PlayerOrientationController).
 //
 // Root cause: The error handler closure `{ error in ... }` inherited @MainActor
 // isolation from the enclosing `Task { @MainActor in ... }`. On iOS 26+,
@@ -12,10 +12,11 @@ import XCTest
 // detects the isolation violation and crashes with EXC_BREAKPOINT.
 //
 // Fix: Extracted error handler as a file-scope @Sendable function in
-// OrientationManager.swift (geometryUpdateErrorHandler), explicitly non-isolated.
+// PlayerOrientationController.swift (geometryUpdateErrorHandler), explicitly non-isolated.
 //
-// This test exercises the requestGeometryUpdate code path by simulating a
-// landscape → portrait rotation while a video is playing.
+// Opening the player requests its geometry (the video decides the orientation);
+// the test then rotates the device
+// landscape ↔ portrait while the video plays.
 
 final class OrientationCrashRegressionUITests: XCTestCase {
 
@@ -51,13 +52,13 @@ final class OrientationCrashRegressionUITests: XCTestCase {
         }
 
         // Allow the video to start buffering before rotating.
-        // Rotate to landscape — triggers OrientationManager.requestGeometryUpdate(.landscape)
+        // Rotate the device to landscape
         #if os(iOS)
         XCUIDevice.shared.orientation = .landscapeLeft
         // Brief dwell to allow UIKit geometry update to complete and any error callback to fire.
         Thread.sleep(forTimeInterval: 1.0)
 
-        // Rotate back to portrait — triggers OrientationManager.requestGeometryUpdate(.portrait)
+        // Rotate the device back to portrait
         #if os(iOS)
         XCUIDevice.shared.orientation = .portrait
         #endif

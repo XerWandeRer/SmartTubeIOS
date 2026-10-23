@@ -81,9 +81,9 @@ renders as a contextual menu, which is the idiomatic iOS equivalent.
 ### 2e. Orientation
 
 The iOS TOS player is presented via `LandscapeAwareHostingController` (the same
-UIKit wrapper used for standard `PlayerView`). `OrientationManager.shared.playerIsActive`
-must be set `true`/`false` in `onAppear`/`onDisappear` to unlock landscape rotation,
-mirroring what `PlayerView+Lifecycle.swift` already does.
+UIKit wrapper used for standard `PlayerView`). Its supported orientations come from
+`PlayerOrientationController.shared.mask`, which the presenter sets up from the
+presented video's aspect ratio (Shorts portrait, everything else landscape).
 
 ### 2f. Mini-player (audio continuity after dismiss)
 
