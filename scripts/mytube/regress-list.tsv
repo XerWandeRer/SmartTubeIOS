@@ -1,0 +1,10 @@
+# MyTube playback regression list (tab-separated): case<TAB>video<TAB>expect
+# video: a fixed ID, or live:<channel path> / upcoming:<channel path> resolved via yt-dlp at run time.
+# expect: ready (AVPlayerItem readyToPlay) or error (the app must fail cleanly, not hang).
+normal	dQw4w9WgXcQ	ready
+shorts	6yX9tINzYf0	ready
+live	live:@LofiGirl/streams	ready
+premiere-upcoming	upcoming:@NASA/streams	error
+age-restricted	HtVdAasjOgU	ready
+music	kJQP7kiw5Fk	ready
+long-10h	8plwv25NYRo	ready
