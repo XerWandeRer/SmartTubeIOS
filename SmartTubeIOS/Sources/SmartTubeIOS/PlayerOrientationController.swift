@@ -59,6 +59,16 @@ public final class PlayerOrientationController {
     /// The orientations the player supports right now.
     var mask: UIInterfaceOrientationMask { policy.wantsLandscape ? .landscape : .portrait }
 
+    /// True while the Shorts player is on screen. It is a SwiftUI full-screen cover
+    /// whose hosting controller cannot be subclassed, so the lock lives in `appMask`.
+    private(set) var isShortsPlayerOnScreen = false
+
+    /// The app-wide mask returned by the app delegate: portrait while Shorts play
+    /// (they are vertical and fill the screen), otherwise everything but upside down.
+    public var appMask: UIInterfaceOrientationMask {
+        isShortsPlayerOnScreen ? .portrait : .allButUpsideDown
+    }
+
     // MARK: - Inputs
 
     func playerPresented(video: Video) {
@@ -102,6 +112,10 @@ public final class PlayerOrientationController {
     }
 
     private func appDidBecomeActive() {
+        if isShortsPlayerOnScreen {
+            invalidateOrientationCache()
+            requestGeometryUpdate(.portrait)
+        }
         reassert(reason: "app active")
     }
 
@@ -111,6 +125,20 @@ public final class PlayerOrientationController {
     func reassert(reason: String) {
         guard isPresented else { return }
         apply(reason: reason)
+    }
+
+    func shortsPlayerAppeared() {
+        isShortsPlayerOnScreen = true
+        orientationLog.notice("[PlayerOrientation] Shorts player on screen — portrait only")
+        invalidateOrientationCache()
+        requestGeometryUpdate(.portrait)
+    }
+
+    func shortsPlayerDisappeared() {
+        guard isShortsPlayerOnScreen else { return }
+        isShortsPlayerOnScreen = false
+        orientationLog.notice("[PlayerOrientation] Shorts player closed")
+        invalidateOrientationCache()
     }
 
     func playerDismissed() {
