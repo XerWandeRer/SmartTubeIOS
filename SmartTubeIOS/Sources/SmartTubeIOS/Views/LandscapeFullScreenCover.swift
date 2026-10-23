@@ -43,7 +43,6 @@ final class LandscapeAwareHostingController: UIHostingController<AnyView> {
         if isBeingDismissed {
             landscapeLog.notice(
                 "[LandscapeAwareHostingController] viewDidDisappear isBeingDismissed=true — calling onDismiss")
-            PlayerOrientationController.shared.playerDismissed()
             onDismiss?()
         }
     }
@@ -180,10 +179,6 @@ private struct LandscapePresenter<Item: Identifiable & Hashable>: UIViewControll
             // Avoid a white flash during the presentation animation, before
             // the hosted SwiftUI content's own black background renders.
             hc.view.backgroundColor = .black
-            // Decide the orientation before UIKit first asks the new VC for it.
-            if let video = item as? Video {
-                PlayerOrientationController.shared.playerPresented(video: video)
-            }
             return hc
         }
 

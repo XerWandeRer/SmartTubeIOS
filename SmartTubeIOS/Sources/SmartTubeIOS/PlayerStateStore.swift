@@ -189,6 +189,20 @@ public final class PlayerStateStore {
         }
     }
 
+    // MARK: - Orientation
+
+    /// The full-screen video last reported to `PlayerOrientationController`.
+    @ObservationIgnored private var reportedFullScreenVideo: Video?
+
+    /// Reports the full-screen video to `PlayerOrientationController` when it changes,
+    /// so the orientation follows this store's state, not the presenting view controller.
+    private func syncOrientation() {
+        let video = presentation == .fullScreen ? currentVideo : nil
+        guard video?.id != reportedFullScreenVideo?.id else { return }
+        reportedFullScreenVideo = video
+        PlayerOrientationController.shared.fullScreenVideoChanged(video)
+    }
+
     // MARK: - Actions
 
     /// Load `video` (if not already loaded) and present the full-screen player.
@@ -210,6 +224,7 @@ public final class PlayerStateStore {
         }
         currentVideo = video
         presentation = .fullScreen
+        syncOrientation()
         storeLog.notice("[PlayerStateStore] play — presentation set to .fullScreen")
     }
 
@@ -217,6 +232,7 @@ public final class PlayerStateStore {
     public func minimize() {
         storeLog.notice("[PlayerStateStore] minimize — currentPresentation=\(String(describing: self.presentation))")
         presentation = .miniPlayer
+        syncOrientation()
         let action = dismissPlayerAction
         dismissPlayerAction = nil
         storeLog.notice(
@@ -228,6 +244,7 @@ public final class PlayerStateStore {
     func expand() {
         storeLog.notice("[PlayerStateStore] expand — currentPresentation=\(String(describing: self.presentation))")
         presentation = .fullScreen
+        syncOrientation()
         storeLog.notice("[PlayerStateStore] expand — presentation set to .fullScreen")
     }
 
@@ -237,6 +254,7 @@ public final class PlayerStateStore {
         vm.stop()
         currentVideo = nil
         presentation = .hidden
+        syncOrientation()
         let action = dismissPlayerAction
         dismissPlayerAction = nil
         storeLog.notice("[PlayerStateStore] stop — presentation set to .hidden, dismissPlayerAction=\(action != nil)")
