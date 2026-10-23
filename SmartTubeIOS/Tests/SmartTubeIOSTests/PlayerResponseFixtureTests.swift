@@ -9,7 +9,8 @@ import Testing
 // with `--uitesting-record-player-responses` (see PlayerResponseRecorder). Fixtures live in
 // Fixtures/PlayerResponses as `<case>-<probe method>.json`, scrubbed of the client IP.
 // Re-record them when YouTube changes a client's response shape; the expectations below
-// describe what each client returned on 2026-10-23 for an unauthenticated session.
+// describe what each client returned on 2026-10-23 (unauthenticated unless the name says
+// signed-in).
 
 @Suite("Player response fixtures")
 struct PlayerResponseFixtureTests {
@@ -79,6 +80,11 @@ struct PlayerResponseFixtureTests {
     @Test("Embedded player: embedder identity denied surfaces the server reason")
     func embeddedDenied() async throws {
         await expectUnavailable("vod-tvembedded", videoId: "dQw4w9WgXcQ", containing: "unavailable")
+    }
+
+    @Test("Signed-in TVHTML5: 'page needs to be reloaded' surfaces as unavailable")
+    func tvAuthReload() async throws {
+        await expectUnavailable("vod-tvauth-signed-in", videoId: "dQw4w9WgXcQ", containing: "reloaded")
     }
 
     @Test("Age-restricted video without sign-in maps to signInRequired")
