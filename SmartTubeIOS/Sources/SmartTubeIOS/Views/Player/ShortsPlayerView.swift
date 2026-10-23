@@ -303,6 +303,9 @@ public struct ShortsPlayerView: View {
             #endif
             .ignoresSafeArea()
             .onAppear {
+                #if os(iOS)
+                PlayerOrientationController.shared.shortsPlayerAppeared()
+                #endif
                 if vm.currentVideoId == videos[currentIndex].id {
                     if vm.wasPlayingBeforeSuspend { vm.resume() }
                 } else {
@@ -318,6 +321,7 @@ public struct ShortsPlayerView: View {
                 vm.stop()
                 #if os(iOS)
                 previousVM?.stop()
+                PlayerOrientationController.shared.shortsPlayerDisappeared()
                 #endif
             }
             .onChange(of: scenePhase) { _, phase in
