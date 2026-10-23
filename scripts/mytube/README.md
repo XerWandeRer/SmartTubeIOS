@@ -8,12 +8,12 @@ cp ~/Developer/MyTube/SmartTubeIOS/scripts/mytube/{mytube-sim.sh,deploy.sh,setup
 
 ### Simulator (`mytube-sim.sh`)
 
-No signing and no keychain, so it works over plain SSH. `MyTube-Golden` (iOS 27.0, iPhone Air)
+Ad-hoc signing needs no keychain, so it works over plain SSH. `MyTube-Golden` (iOS 27.0, iPhone Air)
 keeps the signed-in state; every test run uses a throwaway clone of it.
 
 | Command | What it does |
 |---|---|
-| `build` | Unsigned Debug build into `DD-sim` |
+| `build` | Ad-hoc signed Debug build into `DD-sim` (keeps the team keychain group) |
 | `golden` / `golden-done` | Boot Golden with the GUI for the one-time device-code sign-in, then shut it down |
 | `play <id> [--client m]` | One probe on a fresh clone: result, client, itag, ms, screenshot |
 | `regress [--client m]` | Run `regress-list.tsv`, print a pass/fail table (Markdown report in `sim-out/`) |

@@ -57,15 +57,18 @@ ensure_golden() {
   print $g
 }
 
+# Clones are APFS copy-on-write, so `du` of golden + worker double-counts shared blocks.
+# Warn when the golden device itself exceeds the limit, or a worker has grown more than
+# 1 GB beyond the golden device it was cloned from.
 du_check() {
-  local total=0 u kb
-  for u in $(sims | awk '{ print $1 }'); do
-    [[ -d $DEVICES_DIR/$u ]] || continue
-    kb=$(du -sk $DEVICES_DIR/$u | awk '{ print $1 }')
-    total=$((total + kb))
-  done
-  if ((total > DU_LIMIT_KB)); then
-    note "WARNING: MyTube simulators use $((total / 1024)) MB (> $((DU_LIMIT_KB / 1024)) MB). Run 'reset' or check the golden device."
+  local g=$(golden_udid) w=$(worker_udid) gkb=0 wkb=0
+  [[ -n $g && -d $DEVICES_DIR/$g ]] && gkb=$(du -sk $DEVICES_DIR/$g | awk '{ print $1 }')
+  [[ -n $w && -d $DEVICES_DIR/$w ]] && wkb=$(du -sk $DEVICES_DIR/$w | awk '{ print $1 }')
+  if ((gkb > DU_LIMIT_KB)); then
+    note "WARNING: $GOLDEN uses $((gkb / 1024)) MB (> $((DU_LIMIT_KB / 1024)) MB)."
+  fi
+  if ((wkb - gkb > 1024 * 1024)); then
+    note "WARNING: worker grew $(((wkb - gkb) / 1024)) MB beyond $GOLDEN. Run 'down' or 'reset'."
   fi
 }
 
@@ -102,11 +105,16 @@ need_app() { [[ -d $APP ]] || die "no build at $APP; run '$0 build' first" }
 
 # --- commands --------------------------------------------------------------
 
+# Ad-hoc ("Sign to Run Locally") signing needs no keychain but still embeds the simulated
+# entitlements. Without application-identifier 398CWQ7N6L.<bundle> the app lands in a
+# different keychain access group and cannot read the Golden device's sign-in tokens.
 cmd_build() {
-  local g=$(ensure_golden) log=$OUT/build.log
+  local log=$OUT/build.log
+  # Generic destination: building against the golden device can boot and modify it.
   note "building $SRC → $DD (log: $log)"
   (cd $SRC && xcodebuild build -workspace SmartTube.xcworkspace -scheme SmartTube -configuration Debug \
-    -destination "id=$g" -derivedDataPath $DD CODE_SIGNING_ALLOWED=NO) > $log 2>&1
+    -destination "generic/platform=iOS Simulator" ARCHS=arm64 -derivedDataPath $DD \
+    CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual PROVISIONING_PROFILE_SPECIFIER= DEVELOPMENT_TEAM=398CWQ7N6L) > $log 2>&1
   local rc=$?
   grep -E "error:|\*\* BUILD" $log | tail -20
   print "BUILD_EXIT=$rc"
@@ -396,7 +404,7 @@ cmd_reset() {
 usage() {
   cat <<EOF
 usage: mytube-sim.sh <command>
-  build                      unsigned simulator build of \$MYTUBE_SRC (default $SRC)
+  build                      ad-hoc signed simulator build of \$MYTUBE_SRC (default $SRC)
   golden | golden-done       boot $GOLDEN with GUI for the one-time sign-in / shut it down
   up | down                  fresh worker clone (with app installed) / delete it
   install [--golden]         reinstall the current build on the worker (or golden)

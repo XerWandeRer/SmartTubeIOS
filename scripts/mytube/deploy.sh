@@ -45,7 +45,7 @@ profile_expiry() {
     security cms -D -i "$f" 2>/dev/null | plutil -extract Entitlements.application-identifier raw -o - - 2>/dev/null \
       | grep -qx "398CWQ7N6L.$BUNDLE" || continue
     exp=$(security cms -D -i "$f" 2>/dev/null | plutil -extract ExpirationDate raw -o - -)
-    exp=$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "$exp" +%s 2>/dev/null) || continue
+    exp=$(TZ=UTC date -j -f "%Y-%m-%dT%H:%M:%SZ" "$exp" +%s 2>/dev/null) || continue
     ((exp > best)) && best=$exp
   done
   ((best > 0)) && print "$(((best - now) / 86400)) $(date -r $best '+%Y-%m-%d %H:%M')"
