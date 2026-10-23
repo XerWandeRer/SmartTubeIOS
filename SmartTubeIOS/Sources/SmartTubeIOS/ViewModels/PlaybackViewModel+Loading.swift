@@ -19,6 +19,7 @@ extension PlaybackViewModel {
         )
         playerLog.notice("[benchmark] load started — videoId=\(video.id) title=\(video.title)")
         videoLoadStartedAt = Date()
+        PlaybackProbeLog.start(videoId: video.id)
         lastSuccessfulStreamType = "unknown"
         timeToPlayMs = 0
         timeToHighQualityMs = 0
@@ -578,6 +579,14 @@ extension PlaybackViewModel {
             }
             // File missing or path invalid — fall through to network re-stream.
             playerLog.notice("[loadAsync] localFileURL set but file not accessible, falling through: \(localURL.path)")
+        }
+
+        // Testing override: --uitesting-force-stream-method must reach exhaustiveRetry's
+        // single-method probe. Without this the cache and the VisionOS-first primary path
+        // would usually win before the forced client is ever asked.
+        if StreamMethodProbeSupport.forcedStreamMethod != nil {
+            await exhaustiveRetry(video: video, originalError: nil)
+            return
         }
 
         do {
