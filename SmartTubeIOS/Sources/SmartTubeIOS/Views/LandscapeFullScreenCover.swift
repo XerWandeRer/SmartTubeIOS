@@ -27,16 +27,15 @@ extension TOSPlayerStateStore: FullScreenPlayerDismissible {}
 
 // MARK: - LandscapeAwareHostingController
 
-/// UIHostingController whose supportedInterfaceOrientations returns .allButUpsideDown
-/// while OrientationManager.shared.playerIsActive is true. This replaces SwiftUI's
+/// UIHostingController whose supportedInterfaceOrientations is the player's
+/// orientation mask from PlayerOrientationController. This replaces SwiftUI's
 /// internal PresentationHostingController (which hard-locks to portrait) so that UIKit
-/// accepts requestGeometryUpdate(.landscape) and honours physical device rotations
-/// while the player is on screen.
+/// accepts requestGeometryUpdate(.landscape) while the player is on screen.
 final class LandscapeAwareHostingController: UIHostingController<AnyView> {
     var onDismiss: (() -> Void)?
 
     override var supportedInterfaceOrientations: UIInterfaceOrientationMask {
-        OrientationManager.shared.playerIsActive ? .allButUpsideDown : .portrait
+        PlayerOrientationController.shared.mask
     }
 
     override func viewDidDisappear(_ animated: Bool) {
@@ -44,6 +43,7 @@ final class LandscapeAwareHostingController: UIHostingController<AnyView> {
         if isBeingDismissed {
             landscapeLog.notice(
                 "[LandscapeAwareHostingController] viewDidDisappear isBeingDismissed=true — calling onDismiss")
+            PlayerOrientationController.shared.playerDismissed()
             onDismiss?()
         }
     }
@@ -164,13 +164,28 @@ private struct LandscapePresenter<Item: Identifiable & Hashable>: UIViewControll
         /// Incremented on dismiss; Tasks capture the value at creation and abort if it changed.
         var presentationGeneration = 0
         /// After a dismiss, block re-presentations until this date. Prevents the
-        /// SwiftUI binding oscillation that occurs when playerIsActive toggles and
+        /// SwiftUI binding oscillation that occurs when the orientation mask changes and
         /// UIKit re-queries orientations, causing updateUIViewController(nil) followed
         /// by updateUIViewController(video) within the same run-loop batch.
         var suppressPresentUntil: Date = .distantPast
         /// When the current player was presented. Used to ignore spurious nil updates
         /// that arrive immediately after a present (while UIKit is settling).
         var presentedAt: Date = .distantPast
+
+        private func makeHostingController(
+            for item: Item, content: (Item) -> AnyView
+        ) -> LandscapeAwareHostingController {
+            let hc = LandscapeAwareHostingController(rootView: content(item))
+            hc.modalPresentationStyle = .fullScreen
+            // Avoid a white flash during the presentation animation, before
+            // the hosted SwiftUI content's own black background renders.
+            hc.view.backgroundColor = .black
+            // Decide the orientation before UIKit first asks the new VC for it.
+            if let video = item as? Video {
+                PlayerOrientationController.shared.playerPresented(video: video)
+            }
+            return hc
+        }
 
         func sync(root: UIViewController) {
 
@@ -209,11 +224,7 @@ private struct LandscapePresenter<Item: Identifiable & Hashable>: UIViewControll
                         return
                     }
 
-                    let hc = LandscapeAwareHostingController(rootView: contentBuilder(currentItem))
-                    hc.modalPresentationStyle = .fullScreen
-                    // Avoid a white flash during the presentation animation, before
-                    // the hosted SwiftUI content's own black background renders.
-                    hc.view.backgroundColor = .black
+                    let hc = makeHostingController(for: currentItem, content: contentBuilder)
                     hc.onDismiss = { [weak self] in
                         landscapeLog.notice("[LandscapePresenter] onDismiss — clearing binding and hosted VC")
                         // Suppress new presentations for 0.5 s while the SwiftUI binding
