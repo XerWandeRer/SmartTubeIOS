@@ -1,0 +1,137 @@
+{
+  "endscreen" : {
+
+  },
+  "playabilityStatus" : {
+    "contextParams" : "Q0FFU0FnZ0I=",
+    "errorScreen" : {
+      "playerErrorCommandRenderer" : {
+        "command" : {
+          "clickTrackingParams" : "CAAQu2kiEwjksJzJ38-XAxV8fEwIHaS6CE3KAQQ8SEi_",
+          "showEngagementPanelEndpoint" : {
+            "engagementPanel" : {
+              "engagementPanelSectionListRenderer" : {
+                "content" : {
+                  "sectionListRenderer" : {
+                    "contents" : [
+                      {
+                        "itemSectionRenderer" : {
+                          "contents" : [
+                            {
+                              "compactLinkRenderer" : {
+                                "serviceEndpoint" : {
+                                  "clickTrackingParams" : "CAQQp0wYACITCOSwnMnfz5cDFXx8TAgdpLoITcoBBDxISL8=",
+                                  "commandExecutorCommand" : {
+                                    "commands" : [
+                                      {
+                                        "clickTrackingParams" : "CAQQp0wYACITCOSwnMnfz5cDFXx8TAgdpLoITcoBBDxISL8=",
+                                        "signalAction" : {
+                                          "signal" : "CLOSE_POPUP"
+                                        }
+                                      },
+                                      {
+                                        "clickTrackingParams" : "CAQQp0wYACITCOSwnMnfz5cDFXx8TAgdpLoITcoBBDxISL8=",
+                                        "signalAction" : {
+                                          "signal" : "RELOAD_PAGE_EB"
+                                        }
+                                      }
+                                    ]
+                                  }
+                                },
+                                "title" : {
+                                  "runs" : [
+                                    {
+                                      "text" : "Got it"
+                                    }
+                                  ]
+                                },
+                                "trackingParams" : "CAQQp0wYACITCOSwnMnfz5cDFXx8TAgdpLoITQ=="
+                              }
+                            }
+                          ],
+                          "trackingParams" : "CAMQuy8YACITCOSwnMnfz5cDFXx8TAgdpLoITQ=="
+                        }
+                      }
+                    ],
+                    "trackingParams" : "CAIQui8iEwjksJzJ38-XAxV8fEwIHaS6CE0="
+                  }
+                },
+                "header" : {
+                  "overlayPanelHeaderRenderer" : {
+                    "subtitle" : {
+                      "runs" : [
+                        {
+                          "text" : "The YouTube app needs to restart"
+                        }
+                      ]
+                    },
+                    "title" : {
+                      "runs" : [
+                        {
+                          "text" : "Something went wrong"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "onUserCloseOverrideCommand" : {
+                  "clickTrackingParams" : "CAEQ040EIhMI5LCcyd_PlwMVfHxMCB2kughNygEEPEhIvw==",
+                  "commandExecutorCommand" : {
+                    "commands" : [
+                      {
+                        "clickTrackingParams" : "CAEQ040EIhMI5LCcyd_PlwMVfHxMCB2kughNygEEPEhIvw==",
+                        "signalAction" : {
+                          "signal" : "HISTORY_BACK"
+                        }
+                      },
+                      {
+                        "clickTrackingParams" : "CAEQ040EIhMI5LCcyd_PlwMVfHxMCB2kughNygEEPEhIvw==",
+                        "signalAction" : {
+                          "signal" : "CLOSE_POPUP"
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "identifier" : {
+              "surface" : "ENGAGEMENT_PANEL_SURFACE_WATCH",
+              "tag" : "kabuki-reload-high-error"
+            }
+          }
+        },
+        "trackingParams" : "CAAQu2kiEwjksJzJ38-XAxV8fEwIHaS6CE3KAQQ8SEi_"
+      }
+    },
+    "reason" : "The page needs to be reloaded.",
+    "skip" : {
+      "playabilityErrorSkipConfig" : {
+        "skipOnPlayabilityError" : false
+      }
+    },
+    "status" : "UNPLAYABLE"
+  },
+  "videoDetails" : {
+    "allowRatings" : true,
+    "channelId" : "UCuAXFkgsw1L7xaCfnd5JJOw",
+    "isCrawlable" : true,
+    "isLiveContent" : false,
+    "isOwnerViewing" : false,
+    "isPrivate" : false,
+    "isTvfilmVideo" : false,
+    "isUnpluggedCorpus" : false,
+    "lengthSeconds" : "213",
+    "musicVideoType" : "MUSIC_VIDEO_TYPE_OMV",
+    "thumbnail" : {
+      "thumbnails" : [
+        {
+          "height" : 360,
+          "url" : "https:\/\/i.ytimg.com\/vi\/dQw4w9WgXcQ\/hqdefault.jpg",
+          "width" : 480
+        }
+      ]
+    },
+    "videoId" : "dQw4w9WgXcQ"
+  }
+}
