@@ -147,6 +147,20 @@ public final class TOSPlayerStateStore {
 
     // MARK: - Actions
 
+    // MARK: - Orientation
+
+    /// The full-screen video last reported to `PlayerOrientationController`.
+    @ObservationIgnored private var reportedFullScreenVideo: Video?
+
+    /// Reports the full-screen video to `PlayerOrientationController` when it changes,
+    /// so the orientation follows this store's state, not the presenting view controller.
+    private func syncOrientation() {
+        let video = presentation == .fullScreen ? currentVideo : nil
+        guard video?.id != reportedFullScreenVideo?.id else { return }
+        reportedFullScreenVideo = video
+        PlayerOrientationController.shared.fullScreenVideoChanged(video)
+    }
+
     /// Load `video` and present the TOS player full-screen.
     /// If the same video is already loaded and playing, just expands.
     /// `incognito` (#94) is not honored when re-expanding an already-loaded video —
@@ -207,6 +221,7 @@ public final class TOSPlayerStateStore {
         self.vm = newVM
         self.currentVideo = video
         self.presentation = .fullScreen
+        syncOrientation()
         setActive()
         tosStoreLog.notice("[TOSPlayerStateStore] play — presentation set to .fullScreen, vm created for \(video.id)")
         // When a new vm replaces the one on an already-presented full-screen player,
@@ -234,6 +249,7 @@ public final class TOSPlayerStateStore {
         guard presentation == .fullScreen else { return }
         let wasActive = vm?.playerState == .playing || vm?.playerState == .buffering
         presentation = .miniPlayer
+        syncOrientation()
         let action = dismissPlayerAction
         dismissPlayerAction = nil
         tosStoreLog.notice(
@@ -267,6 +283,7 @@ public final class TOSPlayerStateStore {
             "[TOSPlayerStateStore] expand — currentPresentation=\(String(describing: self.presentation))")
         guard presentation == .miniPlayer else { return }
         presentation = .fullScreen
+        syncOrientation()
         tosStoreLog.notice("[TOSPlayerStateStore] expand — presentation set to .fullScreen")
     }
 
@@ -281,6 +298,7 @@ public final class TOSPlayerStateStore {
         vm = nil
         currentVideo = nil
         presentation = .hidden
+        syncOrientation()
         seenVideoIds = []
         setInactive()
         let action = dismissPlayerAction

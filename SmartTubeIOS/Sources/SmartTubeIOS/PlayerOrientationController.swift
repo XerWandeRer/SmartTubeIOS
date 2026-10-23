@@ -20,10 +20,10 @@ private func geometryUpdateErrorHandler(_ error: Error) {
 ///
 /// The video decides: landscape videos get `.landscape` (the sensor only picks
 /// left or right), portrait videos and Shorts get `.portrait`. Device rotation
-/// never switches between the two. `LandscapeAwareHostingController` returns
-/// `mask`, and `LandscapePresenter` calls `playerPresented`/`playerDismissed`
-/// around the presentation, so the player view's appear/disappear timing does not
-/// matter.
+/// never switches between the two. The app delegate returns `appMask`, which is the
+/// player's `mask` while a full-screen player is shown. The player stores report
+/// their full-screen video through `fullScreenVideoChanged(_:)`, so neither the
+/// presenting view controller nor the player view's appear/disappear timing matters.
 @MainActor
 @Observable
 public final class PlayerOrientationController {
@@ -64,14 +64,27 @@ public final class PlayerOrientationController {
     private(set) var isShortsPlayerOnScreen = false
 
     /// The app-wide mask returned by the app delegate: portrait while Shorts play
-    /// (they are vertical and fill the screen), otherwise everything but upside down.
+    /// (they are vertical and fill the screen), the player's mask while a full-screen
+    /// player is shown, otherwise everything but upside down.
     public var appMask: UIInterfaceOrientationMask {
-        isShortsPlayerOnScreen ? .portrait : .allButUpsideDown
+        if isShortsPlayerOnScreen { return .portrait }
+        if isPresented { return mask }
+        return .allButUpsideDown
     }
 
     // MARK: - Inputs
 
-    func playerPresented(video: Video) {
+    /// A player store's full-screen video changed: non-nil while its player is full
+    /// screen, nil once it is minimized or stopped.
+    func fullScreenVideoChanged(_ video: Video?) {
+        if let video {
+            playerPresented(video: video)
+        } else {
+            playerDismissed()
+        }
+    }
+
+    private func playerPresented(video: Video) {
         if !isPresented {
             isPresented = true
             if rotateBackPending {
@@ -141,7 +154,7 @@ public final class PlayerOrientationController {
         invalidateOrientationCache()
     }
 
-    func playerDismissed() {
+    private func playerDismissed() {
         guard isPresented else { return }
         isPresented = false
         let rotateBack = forcedLandscape
