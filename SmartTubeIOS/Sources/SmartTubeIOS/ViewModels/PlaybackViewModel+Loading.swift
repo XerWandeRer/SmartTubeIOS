@@ -313,8 +313,7 @@ extension PlaybackViewModel {
         // after suspend() and undoing the cancellation above, recreating the same
         // crash task-190 was supposed to have fixed. Re-established in resume().
         // Firebase: a013be1c, regressed June 8 in 4.4(2) — still happening in 4.6.
-        rateObserver?.invalidate()
-        rateObserver = nil
+        removeRateObserver()
         #if canImport(WebKit)
         wkHLSEarlyTask?.cancel()
         wkHLSEarlyTask = nil
@@ -1281,8 +1280,7 @@ extension PlaybackViewModel {
         // function returns. stop()'s synchronous pause()/isPlaying=false ordering
         // happens to make that unreachable today, but invalidating here removes the
         // dependency on that ordering. Re-established defensively in loadAsync().
-        rateObserver?.invalidate()
-        rateObserver = nil
+        removeRateObserver()
         #if canImport(UIKit)
         UIApplication.shared.isIdleTimerDisabled = false
         clearNowPlayingInfo()

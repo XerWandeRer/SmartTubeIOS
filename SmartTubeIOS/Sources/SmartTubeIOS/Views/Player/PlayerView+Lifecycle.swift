@@ -784,7 +784,10 @@ extension PlayerView {
             let pip = AVPictureInPictureController(playerLayer: playerLayer)
             pip?.canStartPictureInPictureAutomaticallyFromInline = true
             let delegate = PiPDelegate(
-                onActiveChange: { active in isPiPActive = active },
+                onActiveChange: { active in
+                    isPiPActive = active
+                    vm.isPictureInPictureActive = active
+                },
                 onDidStart: { vm.updateNowPlayingInfo() }
             )
             pip?.delegate = delegate

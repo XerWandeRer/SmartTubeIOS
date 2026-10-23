@@ -252,7 +252,7 @@ public final class PlaybackViewModel {
     public let player = AVPlayer()
     @ObservationIgnored nonisolated(unsafe) var timeObserver: Any?
     @ObservationIgnored nonisolated(unsafe) var audioSessionObserver: Any?
-    @ObservationIgnored nonisolated(unsafe) var rateObserver: NSKeyValueObservation?
+    @ObservationIgnored nonisolated(unsafe) var rateObserver: Any?
     /// True while the video is being routed to an external display via AirPlay.
     public internal(set) var isAirPlaying: Bool = false
     @ObservationIgnored nonisolated(unsafe) var airPlayObserver: NSKeyValueObservation?
@@ -308,6 +308,11 @@ public final class PlaybackViewModel {
     /// True while `replaceCurrentItem` is executing; guards the rate observer from
     /// treating the transient rate-drop as an unexpected external pause.
     var isSwappingItem: Bool = false
+    /// True while the player's layer is shown in Picture in Picture. Set by PlayerStateStore.
+    public internal(set) var isPictureInPictureActive: Bool = false
+    /// Called when iOS pauses playback because the app went to the background with the
+    /// video layer still attached. PlayerStateStore detaches the layer so audio continues.
+    @ObservationIgnored var onSystemBackgroundPause: (() -> Void)?
     /// True while an AVAudioSession interruption (e.g. an incoming phone call) is in
     /// progress. Suppresses the rate-observer's stall detection/recovery so a
     /// deliberate interruption-pause isn't mistaken for a playback stall (#244).
@@ -497,7 +502,7 @@ public final class PlaybackViewModel {
 
     deinit {
         if let obs = timeObserver { player.removeTimeObserver(obs) }
-        rateObserver?.invalidate()
+        if let obs = rateObserver { NotificationCenter.default.removeObserver(obs) }
         airPlayObserver?.invalidate()
         if let obs = audioSessionObserver { NotificationCenter.default.removeObserver(obs) }
         #if canImport(UIKit)
