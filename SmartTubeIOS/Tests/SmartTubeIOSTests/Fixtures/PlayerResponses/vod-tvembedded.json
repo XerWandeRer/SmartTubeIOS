@@ -1,0 +1,45 @@
+{
+  "playabilityStatus" : {
+    "contextParams" : "Q0FFU0FnZ0I=",
+    "errorCode" : "PLAYABILITY_ERROR_CODE_EMBEDDER_IDENTITY_DENIED",
+    "errorScreen" : {
+      "playerErrorMessageRenderer" : {
+        "reason" : {
+          "runs" : [
+            {
+              "text" : "This video is unavailable"
+            }
+          ]
+        },
+        "subreason" : {
+          "runs" : [
+            {
+              "text" : "Error code: 152 - 18"
+            },
+            {
+              "text" : "\n"
+            },
+            {
+              "text" : "<a href='https:\/\/www.youtube.com\/watch?v=dQw4w9WgXcQ&source_ve_path=MTc4NDI0' target='_blank'>Watch video on YouTube<\/a>"
+            }
+          ]
+        }
+      }
+    },
+    "reason" : "This video is unavailable",
+    "status" : "ERROR"
+  },
+  "responseContext" : {
+    "serviceTrackingParams" : [
+      {
+        "params" : [
+          {
+            "key" : "c",
+            "value" : "WEB_EMBEDDED_PLAYER"
+          }
+        ],
+        "service" : "CSI"
+      }
+    ]
+  }
+}

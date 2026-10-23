@@ -1,0 +1,288 @@
+{
+  "playabilityStatus" : {
+    "contextParams" : "Q0FFU0FnZ0M=",
+    "liveStreamability" : {
+      "liveStreamabilityRenderer" : {
+        "broadcastId" : "3",
+        "pollDelayMs" : "30000",
+        "videoId" : "0sfDth4lMLc"
+      }
+    },
+    "miniplayer" : {
+      "miniplayerRenderer" : {
+        "enableStashedPlayback" : false,
+        "playbackMode" : "PLAYBACK_MODE_ALLOW"
+      }
+    },
+    "pictureInPicture" : {
+      "pictureInPictureRenderer" : {
+        "offByDefault" : false,
+        "pictureInPicturePlayability" : "PICTURE_IN_PICTURE_PLAYABILITY_ALL",
+        "playableInPip" : true,
+        "shouldResumeOnHead" : false
+      }
+    },
+    "playableInEmbed" : true,
+    "status" : "OK"
+  },
+  "streamingData" : {
+    "adaptiveFormats" : [
+      {
+        "bitrate" : 4199987,
+        "fps" : 30,
+        "height" : 1080,
+        "itag" : 137,
+        "maxDvrDurationSec" : 43200,
+        "mimeType" : "video\/mp4; codecs=\"avc1.640028\"",
+        "projectionType" : "RECTANGULAR",
+        "quality" : "hd1080",
+        "qualityLabel" : "1080p",
+        "qualityOrdinal" : "QUALITY_ORDINAL_1080P",
+        "targetDurationSec" : 5,
+        "width" : 1920
+      },
+      {
+        "bitrate" : 2896000,
+        "fps" : 30,
+        "height" : 1080,
+        "itag" : 248,
+        "maxDvrDurationSec" : 43200,
+        "mimeType" : "video\/webm; codecs=\"vp09.00.40.08\"",
+        "projectionType" : "RECTANGULAR",
+        "quality" : "hd1080",
+        "qualityLabel" : "1080p",
+        "qualityOrdinal" : "QUALITY_ORDINAL_1080P",
+        "targetDurationSec" : 5,
+        "width" : 1920
+      },
+      {
+        "bitrate" : 2187400,
+        "fps" : 30,
+        "height" : 720,
+        "itag" : 136,
+        "maxDvrDurationSec" : 43200,
+        "mimeType" : "video\/mp4; codecs=\"avc1.4D401F\"",
+        "projectionType" : "RECTANGULAR",
+        "quality" : "hd720",
+        "qualityLabel" : "720p",
+        "qualityOrdinal" : "QUALITY_ORDINAL_720P",
+        "targetDurationSec" : 5,
+        "width" : 1280
+      },
+      {
+        "bitrate" : 732800,
+        "fps" : 30,
+        "height" : 720,
+        "itag" : 247,
+        "maxDvrDurationSec" : 43200,
+        "mimeType" : "video\/webm; codecs=\"vp09.00.31.08\"",
+        "projectionType" : "RECTANGULAR",
+        "quality" : "hd720",
+        "qualityLabel" : "720p",
+        "qualityOrdinal" : "QUALITY_ORDINAL_720P",
+        "targetDurationSec" : 5,
+        "width" : 1280
+      },
+      {
+        "bitrate" : 1077445,
+        "fps" : 30,
+        "height" : 480,
+        "itag" : 135,
+        "maxDvrDurationSec" : 43200,
+        "mimeType" : "video\/mp4; codecs=\"avc1.4D401F\"",
+        "projectionType" : "RECTANGULAR",
+        "quality" : "large",
+        "qualityLabel" : "480p",
+        "qualityOrdinal" : "QUALITY_ORDINAL_480P",
+        "targetDurationSec" : 5,
+        "width" : 854
+      },
+      {
+        "bitrate" : 528000,
+        "fps" : 30,
+        "height" : 480,
+        "itag" : 244,
+        "maxDvrDurationSec" : 43200,
+        "mimeType" : "video\/webm; codecs=\"vp09.00.30.08\"",
+        "projectionType" : "RECTANGULAR",
+        "quality" : "large",
+        "qualityLabel" : "480p",
+        "qualityOrdinal" : "QUALITY_ORDINAL_480P",
+        "targetDurationSec" : 5,
+        "width" : 854
+      },
+      {
+        "bitrate" : 772630,
+        "fps" : 30,
+        "height" : 360,
+        "highReplication" : true,
+        "itag" : 134,
+        "maxDvrDurationSec" : 43200,
+        "mimeType" : "video\/mp4; codecs=\"avc1.4D401E\"",
+        "projectionType" : "RECTANGULAR",
+        "quality" : "medium",
+        "qualityLabel" : "360p",
+        "qualityOrdinal" : "QUALITY_ORDINAL_360P",
+        "targetDurationSec" : 5,
+        "width" : 640
+      },
+      {
+        "bitrate" : 236800,
+        "fps" : 30,
+        "height" : 360,
+        "itag" : 243,
+        "maxDvrDurationSec" : 43200,
+        "mimeType" : "video\/webm; codecs=\"vp09.00.21.08\"",
+        "projectionType" : "RECTANGULAR",
+        "quality" : "medium",
+        "qualityLabel" : "360p",
+        "qualityOrdinal" : "QUALITY_ORDINAL_360P",
+        "targetDurationSec" : 5,
+        "width" : 640
+      },
+      {
+        "bitrate" : 419256,
+        "fps" : 30,
+        "height" : 240,
+        "itag" : 133,
+        "maxDvrDurationSec" : 43200,
+        "mimeType" : "video\/mp4; codecs=\"avc1.4D4015\"",
+        "projectionType" : "RECTANGULAR",
+        "quality" : "small",
+        "qualityLabel" : "240p",
+        "qualityOrdinal" : "QUALITY_ORDINAL_240P",
+        "targetDurationSec" : 5,
+        "width" : 426
+      },
+      {
+        "bitrate" : 121000,
+        "fps" : 30,
+        "height" : 240,
+        "itag" : 242,
+        "maxDvrDurationSec" : 43200,
+        "mimeType" : "video\/webm; codecs=\"vp09.00.20.08\"",
+        "projectionType" : "RECTANGULAR",
+        "quality" : "small",
+        "qualityLabel" : "240p",
+        "qualityOrdinal" : "QUALITY_ORDINAL_240P",
+        "targetDurationSec" : 5,
+        "width" : 426
+      },
+      {
+        "bitrate" : 192223,
+        "fps" : 15,
+        "height" : 144,
+        "itag" : 160,
+        "maxDvrDurationSec" : 43200,
+        "mimeType" : "video\/mp4; codecs=\"avc1.42C00B\"",
+        "projectionType" : "RECTANGULAR",
+        "quality" : "tiny",
+        "qualityLabel" : "144p",
+        "qualityOrdinal" : "QUALITY_ORDINAL_144P",
+        "targetDurationSec" : 5,
+        "width" : 256
+      },
+      {
+        "bitrate" : 111000,
+        "fps" : 30,
+        "height" : 144,
+        "itag" : 278,
+        "maxDvrDurationSec" : 43200,
+        "mimeType" : "video\/webm; codecs=\"vp09.00.11.08\"",
+        "projectionType" : "RECTANGULAR",
+        "quality" : "tiny",
+        "qualityLabel" : "144p",
+        "qualityOrdinal" : "QUALITY_ORDINAL_144P",
+        "targetDurationSec" : 5,
+        "width" : 256
+      },
+      {
+        "audioChannels" : 2,
+        "audioQuality" : "AUDIO_QUALITY_LOW",
+        "audioSampleRate" : "22050",
+        "bitrate" : 64000,
+        "itag" : 139,
+        "maxDvrDurationSec" : 43200,
+        "mimeType" : "audio\/mp4; codecs=\"mp4a.40.5\"",
+        "projectionType" : "RECTANGULAR",
+        "quality" : "tiny",
+        "qualityOrdinal" : "QUALITY_ORDINAL_UNKNOWN",
+        "targetDurationSec" : 5
+      },
+      {
+        "audioChannels" : 2,
+        "audioQuality" : "AUDIO_QUALITY_MEDIUM",
+        "audioSampleRate" : "44100",
+        "bitrate" : 144000,
+        "highReplication" : true,
+        "itag" : 140,
+        "maxDvrDurationSec" : 43200,
+        "mimeType" : "audio\/mp4; codecs=\"mp4a.40.2\"",
+        "projectionType" : "RECTANGULAR",
+        "quality" : "tiny",
+        "qualityOrdinal" : "QUALITY_ORDINAL_UNKNOWN",
+        "targetDurationSec" : 5
+      }
+    ],
+    "aspectRatio" : 1.7777778,
+    "expiresInSeconds" : "21540",
+    "serverAbrStreamingUrl" : "https:\/\/rr9---sn-qja5m5-5g.googlevideo.com\/videoplayback?expire=1792762475&ei=Cw7baracN9Kjt7EPsJDK2Qk&ip=0.0.0.0&id=0sfDth4lMLc.3&source=yt_live_broadcast&requiressl=yes&xpc=EgVo2aDSNQ%3D%3D&met=1792740875%2C&mh=Lm&mm=44%2C29&mn=sn-qja5m5-5g%2Csn-a5meknzk&ms=lva%2Crdu&mv=u&mvi=9&pl=54&rms=lva%2Clva&ss=1&ssa=1&spc=mpRQ_9a5lmiRUd15ZyUkjsDHrG6LB1Bxa2C2vkMUWY3odwimmZBeHpVqYMyGSw&live=1&hang=1&noclen=1&svpuc=1&sabr=1&rqh=1&reg=0&mt=1792740552&fvip=5&epbp=1&keepalive=yes&fexp=51565115&c=IOS&sparams=expire%2Cei%2Cip%2Cid%2Csource%2Crequiressl%2Cxpc%2Css%2Cssa%2Cspc%2Clive%2Chang%2Cnoclen%2Csvpuc%2Csabr%2Crqh%2Creg&sig=AE0s2JYwRAIgTS2s4Ycf5cxKotfxMJmsgtVpUDKyCOtoLidcoOHi8HwCIF0b_Yfe2FzlLeW5O3xOoaEZCizuam-_X0h332YkajLJ&lsparams=met%2Cmh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Crms&lsig=APaTxxMwRQIgfXtyRIx1NMTN1VDyy4Ha6bVs8newj5nZEUir6t2MXTcCIQDKq3xACp57T0xkuo9B3qvn9j0i_zxV9U_kHdl023IjFA%3D%3D"
+  },
+  "videoDetails" : {
+    "allowRatings" : true,
+    "author" : "Lofi Girl",
+    "channelId" : "UCSJ4gkVC6NrvII8umztf0Ow",
+    "isCrawlable" : true,
+    "isLive" : true,
+    "isLiveContent" : true,
+    "isLiveDvrEnabled" : true,
+    "isLowLatencyLiveStream" : false,
+    "isOwnerViewing" : false,
+    "isPrivate" : false,
+    "isTvfilmVideo" : false,
+    "isUnpluggedCorpus" : false,
+    "keywords" : [
+      "lofi girl",
+      "chilledcow",
+      "lofi hip hop radio",
+      "halloween ambience",
+      "spooky lofi",
+      "halloween lofi",
+      "spooky ambience",
+      "halloween background",
+      "halloween music",
+      "relaxing halloween music",
+      "scary music",
+      "haunted house ambience",
+      "creepy lofi",
+      "beats to study to",
+      "beats to chill to",
+      "study music",
+      "chill music",
+      "relax music",
+      "lofi music",
+      "lofi beats"
+    ],
+    "latencyClass" : "MDE_STREAM_OPTIMIZATIONS_RENDERER_LATENCY_NORMAL",
+    "lengthSeconds" : "0",
+    "liveChunkReadahead" : 2,
+    "shortDescription" : "Pumpkins carved and jack-o'-lanterns aglow, the spookiest night of the year is here! Tune into Lofi Girl’s 24\/7 radio for an immersive halloween ambience, where cozy tunes blend seamlessly with spooky lofi rhythms. Every note flickers like candlelight; every beat captures the warm glow of the season. Let this autumn atmosphere offer a cozy, mysterious experience perfect for a chilling night in. Press play for the perfect halloween background music for studying, relaxing, or keeping you company all night long. 🎃\n\n🎼 | Listen on Spotify, Apple music and more\n→  https:\/\/lnk.to\/halloween-lofi02\n\n🌎 | Lofi Girl on all social media\n→  https:\/\/link.lofigirl.com\/m\/Community\n\n🌐| Our Websites\n→  https:\/\/link.lofigirl.com\/m\/website\n\n👕 | Lofi Girl merch\n→  https:\/\/link.lofigirlshop.com\/shop\n\n🎮 | Our video games\n→ https:\/\/link.lofigirl.com\/m\/games\n\n🎭 | Create your lofi avatar now\n→  https:\/\/lofigirl.com\/generator\/\n\n🎨 | Art by Lofi Studio \nProduction: Léonore Kuszel,  Camille Bougerol\nArt Direction & Supervision: Laura Vuillerme, Julien Maret \nBG: Manon Bailly, Laura Vuillerme\nPosing\/Chara Design: Emile Maret, Laura Vuillerme\nAnimation: Jeanne Griseri\nAssist, clean & color: Sam Delpeux, Léa Savinel, Jasmine Nacer-Cherif\nCompositing: Maëlle Richard de Vesvrotte\n\n🤗 Thank you for listening, I hope you will have a good time here\n\n🧡All visuals and music in this video are 100% crafted by talented human artists, without the use of AI. We’re committed to delivering genuine, hand-made creations for our audience to enjoy.",
+    "thumbnail" : {
+      "thumbnails" : [
+        {
+          "height" : 360,
+          "url" : "https:\/\/i.ytimg.com\/vi\/0sfDth4lMLc\/hqdefault.jpg?v=6ad771e2",
+          "width" : 480
+        },
+        {
+          "height" : 480,
+          "url" : "https:\/\/i.ytimg.com\/vi\/0sfDth4lMLc\/sddefault.jpg?v=6ad771e2",
+          "width" : 640
+        }
+      ]
+    },
+    "title" : "24\/7 halloween ambience 🎃 spooky lofi to get chills to",
+    "videoId" : "0sfDth4lMLc",
+    "viewCount" : "411931"
+  }
+}
