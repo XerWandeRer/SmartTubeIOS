@@ -759,9 +759,6 @@ extension PlayerView {
                 try? await Task.sleep(for: .milliseconds(250))
             }
         }
-        .onChange(of: isLandscapeLocked) { _, isLocked in
-            PlayerOrientationController.shared.setLandscapeLocked(isLocked)
-        }
         #endif
         .navigationDestination(item: $channelDestination) { dest in
             ChannelView(channelId: dest.channelId)
@@ -818,7 +815,6 @@ extension PlayerView {
             controlScale: controlScale,
             showMoreMenu: $showMoreMenu,
             channelDestination: $channelDestination,
-            isLandscapeLocked: $isLandscapeLocked,
             showQualityPicker: $showQualityPicker,
             showSpeedPicker: $showSpeedPicker,
             showAudioTrackPicker: $showAudioTrackPicker,

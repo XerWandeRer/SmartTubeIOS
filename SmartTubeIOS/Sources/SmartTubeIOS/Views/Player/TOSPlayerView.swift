@@ -97,9 +97,6 @@ public struct TOSPlayerView: View {
     @State private var controlsVisible = false
     @State private var controlsHideTask: Task<Void, Never>? = nil
     private let controlsHideDelay: Double = 4
-    /// User-forced landscape, independent of the device's physical rotation lock.
-    /// See `tosPlayer.landscapeLockButton`'s doc comment.
-    @State private var isLandscapeLocked = false
 
     private func showControls() {
         controlsHideTask?.cancel()
@@ -487,11 +484,6 @@ public struct TOSPlayerView: View {
             // (tosState.vm is replaced by TOSPlayerStateStore.play). Without this the
             // controls stay hidden if the user swiped while they were already hidden.
             .onChange(of: vm.videoId) { _, _ in showControls() }
-            // Orientation follows the video (see PlayerOrientationController); the lock
-            // button forces landscape for portrait videos.
-            .onChange(of: isLandscapeLocked) { _, isLocked in
-                PlayerOrientationController.shared.setLandscapeLocked(isLocked)
-            }
             .onChange(of: scenePhase) { _, phase in
                 guard phase == .active else { return }
                 vm.handleForeground()
@@ -548,20 +540,20 @@ public struct TOSPlayerView: View {
                 speedButton(vm: vm)
                 moreButton(vm: vm)
 
-                // Landscape lock — lets the user force landscape playback without
-                // disabling their device's portrait orientation lock. Ported from
-                // PlayerView+ControlElements.swift (the old AVPlayer pipeline) —
-                // this was never carried over when TOS became the iOS default,
-                // which is why it disappeared for users who had it before.
+                // Manual orientation toggle — flips portrait/landscape for this video
+                // (see PlayerOrientationController). Mirrors PlayerView+ControlElements.swift.
                 Button {
-                    isLandscapeLocked.toggle()
+                    PlayerOrientationController.shared.toggleOrientation()
                 } label: {
-                    Image(systemName: isLandscapeLocked ? "lock.rotation" : "lock.rotation.open")
-                        .font(.title2)
-                        .foregroundStyle(.white)
-                        .padding(9)
-                        .background(.black.opacity(0.4))
-                        .clipShape(Circle())
+                    Image(
+                        systemName: PlayerOrientationController.shared.policy.wantsLandscape
+                            ? AppSymbol.rotateToPortrait : AppSymbol.rotateToLandscape
+                    )
+                    .font(.title2)
+                    .foregroundStyle(.white)
+                    .padding(9)
+                    .background(.black.opacity(0.4))
+                    .clipShape(Circle())
                 }
                 .accessibilityIdentifier("tosPlayer.landscapeLockButton")
 

@@ -52,7 +52,6 @@ struct PlayerOrientationPolicyTests {
         var policy = PlayerOrientationPolicy()
         policy.begin(videoID: "v", isShort: false)
         policy.confirmAspect(videoID: "v", width: 1080, height: 1920)
-        policy.end()
         policy.begin(videoID: "v", isShort: false)
         #expect(policy.isAspectConfirmed)
         #expect(!policy.wantsLandscape)
@@ -68,13 +67,34 @@ struct PlayerOrientationPolicyTests {
         #expect(policy.wantsLandscape)
     }
 
-    @Test("The landscape lock forces landscape until the player closes")
-    func lockForcesLandscapeUntilEnd() {
+    @Test("The manual toggle flips the orientation for the current video")
+    func manualToggleFlips() {
         var policy = PlayerOrientationPolicy()
         policy.begin(videoID: "short", isShort: true)
-        policy.isLandscapeLocked = true
+        policy.toggleManually()
         #expect(policy.wantsLandscape)
-        policy.end()
+        policy.toggleManually()
         #expect(!policy.wantsLandscape)
+    }
+
+    @Test("The manual choice beats the decoded size")
+    func manualToggleBeatsDecodedSize() {
+        var policy = PlayerOrientationPolicy()
+        policy.begin(videoID: "v", isShort: false)
+        policy.toggleManually()
+        policy.confirmAspect(videoID: "v", width: 1920, height: 1080)
+        #expect(!policy.wantsLandscape)
+    }
+
+    @Test("The manual choice lasts for the current video only")
+    func manualToggleResetsOnNextVideo() {
+        var policy = PlayerOrientationPolicy()
+        policy.begin(videoID: "a", isShort: false)
+        policy.toggleManually()
+        policy.begin(videoID: "a", isShort: false)
+        #expect(!policy.wantsLandscape)
+        policy.begin(videoID: "b", isShort: false)
+        #expect(policy.manualLandscape == nil)
+        #expect(policy.wantsLandscape)
     }
 }

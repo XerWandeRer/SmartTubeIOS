@@ -24,7 +24,6 @@ struct PlayerControlsOverlay: View {
     @Binding var channelDestination: ChannelDestination?
 
     #if os(iOS)
-    @Binding var isLandscapeLocked: Bool
     @Environment(PlayerStateStore.self) private var playerState
     var vm: PlaybackViewModel { playerState.vm }
     #else
@@ -344,16 +343,19 @@ struct PlayerControlsOverlay: View {
                     }
 
                     #if os(iOS)
-                    // Landscape lock button
+                    // Manual orientation toggle — flips portrait/landscape for this video.
                     Button {
-                        isLandscapeLocked.toggle()
+                        PlayerOrientationController.shared.toggleOrientation()
                     } label: {
-                        Image(systemName: isLandscapeLocked ? "lock.rotation" : "lock.rotation.open")
-                            .font(.system(size: 18 * controlScale))
-                            .foregroundStyle(.white)
-                            .padding(8)
-                            .background(.black.opacity(0.4))
-                            .clipShape(Circle())
+                        Image(
+                            systemName: PlayerOrientationController.shared.policy.wantsLandscape
+                                ? AppSymbol.rotateToPortrait : AppSymbol.rotateToLandscape
+                        )
+                        .font(.system(size: 18 * controlScale))
+                        .foregroundStyle(.white)
+                        .padding(8)
+                        .background(.black.opacity(0.4))
+                        .clipShape(Circle())
                     }
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("player.landscapeLockButton")
