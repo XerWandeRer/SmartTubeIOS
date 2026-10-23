@@ -159,21 +159,8 @@ struct MainTabView: View {
         // Read these in body so SwiftUI's @Observable tracker registers the dependency.
         // If only accessed inside the Binding.get closure, changes won't trigger a body re-render
         // and updateUIViewController won't be called, so the cover never dismisses.
-        let fullScreenVideo: Video? = playerState.presentation == .fullScreen ? playerState.currentVideo : nil
         let _ = rootLog.notice(
-            "[MainTabView] body re-render — presentation=\(String(describing: playerState.presentation)) fullScreenVideo=\(fullScreenVideo?.id ?? "nil")"
-        )
-        let fullScreenBinding = Binding<Video?>(
-            get: { fullScreenVideo },
-            set: { newValue in
-                // Only transition to mini player when the cover is dismissed while
-                // presentation is still .fullScreen. If stop() already moved us to
-                // .hidden, the async onDismiss callback must not resurrect the mini
-                // player by calling minimize() — that is the race condition that
-                // caused the mini-player X button to unexpectedly restore fullscreen.
-                guard newValue == nil, playerState.presentation == .fullScreen else { return }
-                playerState.minimize()
-            }
+            "[MainTabView] body re-render — presentation=\(String(describing: playerState.presentation))"
         )
         // TOS full-screen cover binding — mirrors the AVPlayer binding above.
         // When the user swipes down or the system dismisses the cover while TOS is
@@ -236,7 +223,8 @@ struct MainTabView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             // Reserve vertical space for whichever mini-player is visible so
             // scrollable content is not obscured (only one can be active at a time).
-            if playerState.presentation == .miniPlayer || tosState.presentation == .miniPlayer {
+            // PROTOTYPE (XER-13): the AVPlayer mini window floats (XER-12) and reserves nothing.
+            if tosState.presentation == .miniPlayer {
                 Color.clear.frame(height: 62)
             }
         }
@@ -248,16 +236,7 @@ struct MainTabView: View {
         .overlay(alignment: .bottom) {
             // Only one mini-player can be active at a time: AVPlayer and TOS are
             // mutually exclusive (onChange stops the other before starting the new one).
-            if playerState.presentation == .miniPlayer {
-                VStack(spacing: 0) {
-                    MiniPlayerView()
-                    Color.clear
-                    .frame(height: tabBarBottomInset)
-                    .allowsHitTesting(false)
-                }
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-                .animation(.easeInOut(duration: 0.2), value: playerState.presentation)
-            } else if tosState.presentation == .miniPlayer {
+            if tosState.presentation == .miniPlayer {
                 VStack(spacing: 0) {
                     TOSMiniPlayerView()
                     Color.clear
@@ -268,8 +247,9 @@ struct MainTabView: View {
                 .animation(.easeInOut(duration: 0.2), value: tosState.presentation)
             }
         }
-        .landscapePlayerCover(item: fullScreenBinding, dismissStore: playerState) { video in
-            PlayerView(video: video, api: api)
+        // PROTOTYPE (XER-13): full screen and mini player are one resident layer.
+        .overlay {
+            ResidentPlayerLayer(tabBarBottomInset: tabBarBottomInset)
         }
         // TOS player full-screen cover — presented when tosState.presentation == .fullScreen.
         // TOSPlayerView reads tosState from the environment (injected via AppEntry) so the

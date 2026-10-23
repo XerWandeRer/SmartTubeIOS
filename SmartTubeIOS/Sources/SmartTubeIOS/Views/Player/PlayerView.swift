@@ -51,6 +51,8 @@ public struct PlayerView: View {
     var playerLayer: AVPlayerLayer { playerState.playerHostView.playerLayer }
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
     @Environment(\.verticalSizeClass) var verticalSizeClass
+    /// PROTOTYPE (XER-13): set when hosted by ResidentPlayerLayer.
+    @Environment(\.residentPlayer) var residentPlayer
     #endif
     /// True while the app is backgrounded. Prevents `onDisappear` from calling
     /// `suspend()` when iOS fires it as a side-effect of backgrounding rather

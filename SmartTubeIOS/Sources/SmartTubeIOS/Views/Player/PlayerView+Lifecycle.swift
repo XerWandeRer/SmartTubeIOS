@@ -80,17 +80,23 @@ extension PlayerView {
     private var playerContentView: some View {
         GeometryReader { geo in
             ZStack {
-                Color.black.ignoresSafeArea()
-
                 #if os(iOS)
-                // FullScreenPlayerLayerView: wraps PersistentPlayerHostView so the AVPlayerLayer
-                // survives PlayerView dismiss/re-present cycles (mini-player feature).
-                FullScreenPlayerLayerView(
-                    hostView: playerState.playerHostView,
-                    videoGravity: store.settings.videoGravityMode.avGravity
-                )
-                .ignoresSafeArea()
-                .accessibilityHidden(true)
+                // PROTOTYPE (XER-13): the resident layer draws the video behind us.
+                if residentPlayer == nil {
+                    Color.black.ignoresSafeArea()
+                    // FullScreenPlayerLayerView: wraps PersistentPlayerHostView so the AVPlayerLayer
+                    // survives PlayerView dismiss/re-present cycles (mini-player feature).
+                    FullScreenPlayerLayerView(
+                        hostView: playerState.playerHostView,
+                        videoGravity: store.settings.videoGravityMode.avGravity
+                    )
+                    .ignoresSafeArea()
+                    .accessibilityHidden(true)
+                }
+                #else
+                Color.black.ignoresSafeArea()
+                #endif
+                #if os(iOS)
                 // Audio-only mode: overlay the thumbnail over the (hidden) player layer.
                 // The AVPlayerLayer stays in the hierarchy so PiP attachment is undisturbed.
                 if vm.isAudioOnlyMode {
@@ -177,6 +183,10 @@ extension PlayerView {
                     onLongPressStart: { vm.beginHoldSpeed() },
                     onLongPressEnd: { vm.endHoldSpeed() },
                     onSwipeDown: { store.settings.miniPlayerEnabled ? playerState.minimize() : playerState.stop() },
+                    // PROTOTYPE (XER-13): follow the finger in portrait; landscape keeps the discrete swipe.
+                    onVerticalPan: residentPlayer.flatMap { ctx in
+                        vm.isLandscape ? nil : ctx.onCollapseDrag
+                    },
                     // Disabled during scrubbing so the Slider can claim touches uncontested.
                     // Also disabled when controls are visible so SwiftUI buttons (Menu, etc.)
                     // receive touches directly without UIKit gesture interference.
@@ -236,10 +246,23 @@ extension PlayerView {
                     // (abs(dx) > abs(dy), distance > 50 pt) trigger navigation.
                     .simultaneousGesture(
                         DragGesture(minimumDistance: 50, coordinateSpace: .global)
+                            .onChanged { value in
+                                // PROTOTYPE (XER-13): follow the finger in portrait.
+                                let dx = value.translation.width
+                                let dy = value.translation.height
+                                guard let ctx = residentPlayer, !vm.isLandscape, !isTransitioning, !vm.isScrubbing,
+                                    dy > 0, abs(dy) > abs(dx)
+                                else { return }
+                                ctx.onCollapseDrag(dy, value.velocity.height, false)
+                            }
                             .onEnded { value in
                                 let dx = value.translation.width
                                 let dy = value.translation.height
                                 guard !isTransitioning, !vm.isScrubbing else { return }
+                                if let ctx = residentPlayer, !vm.isLandscape, dy > 0, abs(dy) > abs(dx) {
+                                    ctx.onCollapseDrag(dy, value.velocity.height, true)
+                                    return
+                                }
                                 // Swipe-down → minimize to mini-player (or stop if disabled)
                                 if dy > 50, abs(dy) > abs(dx) {
                                     store.settings.miniPlayerEnabled ? playerState.minimize() : playerState.stop()
@@ -319,12 +342,14 @@ extension PlayerView {
             }
             .offset(x: slideOffset)
         }
-        .background(Color.black.ignoresSafeArea())
         #if os(iOS)
+        .background(residentPlayer == nil ? Color.black.ignoresSafeArea() : nil)
         .toast(message: $scaleToast)
         .toast(message: $seekToastMessage)
         .toast(message: $qualityToastMessage)
         .toast(message: Binding(get: { vm.toastMessage }, set: { vm.toastMessage = $0 }))
+        #else
+        .background(Color.black.ignoresSafeArea())
         #endif
     }
 
@@ -591,7 +616,7 @@ extension PlayerView {
             #elseif os(iOS)
             playerContentView
                 .navigationBarHidden(true)
-                .statusBarHidden(true)
+                .statusBarHidden(residentPlayer?.isExpanded ?? true)
                 .toolbar(.hidden, for: .tabBar)
             #else
             playerContentView

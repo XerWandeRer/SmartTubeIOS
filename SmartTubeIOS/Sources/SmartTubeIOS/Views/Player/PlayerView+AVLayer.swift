@@ -171,6 +171,9 @@ struct PlayerSwipeGestureOverlay: UIViewRepresentable {
     var onLongPressStart: (() -> Void)?
     var onLongPressEnd: (() -> Void)?
     var onSwipeDown: (() -> Void)? = nil
+    /// PROTOTYPE (XER-13): when set, a downward pan reports translation, velocity and
+    /// "ended" continuously instead of firing `onSwipeDown` once.
+    var onVerticalPan: (@MainActor @Sendable (CGFloat, CGFloat, Bool) -> Void)? = nil
     var isEnabled: Bool = true
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -237,11 +240,30 @@ struct PlayerSwipeGestureOverlay: UIViewRepresentable {
         weak var doubleTap: UITapGestureRecognizer?
         weak var longPress: UILongPressGestureRecognizer?
         private let minDistance: CGFloat = 40
+        /// PROTOTYPE (XER-13): axis locked on the first movement of a pan.
+        private var isVerticalPan: Bool?
 
         init(_ parent: PlayerSwipeGestureOverlay) { self.parent = parent }
 
         @MainActor @objc func handlePan(_ gr: UIPanGestureRecognizer) {
             let t = gr.translation(in: gr.view)
+            if let onVerticalPan = parent.onVerticalPan {
+                if gr.state == .changed, isVerticalPan == nil, t != .zero {
+                    isVerticalPan = abs(t.y) > abs(t.x) && t.y > 0
+                }
+                if isVerticalPan == true {
+                    let v = gr.velocity(in: gr.view).y
+                    switch gr.state {
+                    case .changed: onVerticalPan(t.y, v, false)
+                    case .ended: onVerticalPan(t.y, v, true)
+                    case .cancelled, .failed: onVerticalPan(0, 0, true)
+                    default: break
+                    }
+                    if gr.state != .changed { isVerticalPan = nil }
+                    return
+                }
+                if gr.state == .ended || gr.state == .cancelled || gr.state == .failed { isVerticalPan = nil }
+            }
             switch gr.state {
             case .changed:
                 // Only forward horizontal pan for slide-offset animation.

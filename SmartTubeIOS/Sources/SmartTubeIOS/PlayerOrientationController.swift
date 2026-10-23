@@ -66,7 +66,11 @@ public final class PlayerOrientationController {
     /// The app-wide mask returned by the app delegate: portrait while Shorts play
     /// (they are vertical and fill the screen), otherwise everything but upside down.
     public var appMask: UIInterfaceOrientationMask {
-        isShortsPlayerOnScreen ? .portrait : .allButUpsideDown
+        if isShortsPlayerOnScreen { return .portrait }
+        // PROTOTYPE (XER-13): the player is a resident layer in the main window, not a
+        // presented view controller, so the app delegate supplies its mask.
+        if isPresented { return mask }
+        return .allButUpsideDown
     }
 
     // MARK: - Inputs
