@@ -135,6 +135,10 @@ public final class PlaybackViewModel {
     public var error: Error? {
         didSet {
             guard let error else { return }
+            PlaybackProbeLog.error(
+                videoId: currentVideo?.id ?? "unknown",
+                elapsedMs: Int(Date().timeIntervalSince(videoLoadStartedAt) * 1000),
+                streamURL: lastAttemptedStreamURL, error: error)
             let nsError = error as NSError
             // Transient connectivity errors are expected in poor-network conditions and are
             // not actionable via Crashlytics. Logging them caused a spike in non-fatal events
@@ -262,7 +266,15 @@ public final class PlaybackViewModel {
     /// Used by the slow-load Crashlytics event to identify which fallback path was used.
     var lastSuccessfulStreamType: String = "unknown"
     /// Elapsed ms from `load()` to the first `readyToPlay` (low-quality fast-start frame). 0 = not yet measured.
-    var timeToPlayMs: Int = 0
+    var timeToPlayMs: Int = 0 {
+        didSet {
+            guard timeToPlayMs > 0, timeToPlayMs != oldValue, let id = currentVideo?.id else { return }
+            PlaybackProbeLog.ready(
+                videoId: id, elapsedMs: timeToPlayMs, streamURL: lastAttemptedStreamURL,
+                infoURL: playerInfo?.formats.lazy.compactMap(\.url).first,
+                streamType: lastSuccessfulStreamType)
+        }
+    }
     /// Elapsed ms from `load()` to the quality-ramp task firing (~readyToPlay + 800 ms). 0 = not yet measured.
     var timeToHighQualityMs: Int = 0
     /// Cache hit/miss summary set at load time (e.g. "pi:HIT wkHLS:MISS").
