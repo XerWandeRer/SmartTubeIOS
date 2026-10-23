@@ -104,7 +104,6 @@ enum AppSection: String, CaseIterable, Identifiable {
     case home = "Home"
     case search = "Search"
     case library = "Library"
-    case channel = "Channel"
     case settings = "Settings"
 
     var id: String { rawValue }
@@ -114,7 +113,6 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .home: return AppSymbol.home
         case .search: return AppSymbol.search
         case .library: return AppSymbol.library
-        case .channel: return AppSymbol.channel
         case .settings: return AppSymbol.settings
         }
     }
@@ -125,7 +123,6 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .home: HomeView(api: api)
         case .search: SearchView()
         case .library: LibraryView()
-        case .channel: ChannelSwitcherView()
         case .settings: SettingsView()
         }
     }
@@ -220,6 +217,9 @@ struct MainTabView: View {
         .environment(searchVM)
         .onReceive(NotificationCenter.default.publisher(for: .navigateToSearch)) { _ in
             selectedTab = .search
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .activeChannelDidChange)) { _ in
+            selectedTab = .home
         }
         #if os(iOS)
         // App Intents / Spotlight (see AppEntry.handleOpenURL).
@@ -369,6 +369,9 @@ struct MainTVTabView: View {
             }
         }
         .environment(searchVM)
+        .onReceive(NotificationCenter.default.publisher(for: .activeChannelDidChange)) { _ in
+            selectedTab = .home
+        }
     }
 }
 #endif
@@ -417,6 +420,9 @@ struct MainSidebarView: View {
                 NavigationStack { (selectedSection ?? .home).destination(api: api) }
             }
             .environment(searchVM)
+            .onReceive(NotificationCenter.default.publisher(for: .activeChannelDidChange)) { _ in
+                selectedSection = .home
+            }
 
             // Full-window player overlay — avoids macOS sheet coordinate issues that
             // prevent XCUITest click events from reaching controls inside a popover window.
