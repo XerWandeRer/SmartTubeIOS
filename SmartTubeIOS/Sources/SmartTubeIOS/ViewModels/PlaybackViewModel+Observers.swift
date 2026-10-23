@@ -47,7 +47,8 @@ extension PlaybackViewModel {
         // is actually silent, causing handleForeground() to re-start a ghost session.
         //
         // Uses AVPlayer.rateDidChangeNotification rather than KVO so the handler sees
-        // *why* the rate changed: the system pausing a backgrounded app is not a stall.
+        // *why* the rate changed: the system pausing a backgrounded app is not a stall,
+        // and neither is the user pausing from the PiP window.
         removeRateObserver()
         rateObserver = NotificationCenter.default.addObserver(
             forName: AVPlayer.rateDidChangeNotification,
@@ -181,6 +182,17 @@ extension PlaybackViewModel {
             onSystemBackgroundPause?()
             player.rate = Float(settings.playbackSpeed)
             playerLog.notice("[rateObserver] system paused on backgrounding — resumed for background playback")
+            return true
+        }
+        // Play/pause from the PiP window is a user action, not a stall.
+        if isPictureInPictureActive, reason == .setRateCalled {
+            if newRate == 0, isPlaying {
+                isPlaying = false
+                updateNowPlayingPlayback()
+            } else if newRate > 0, !isPlaying {
+                isPlaying = true
+                updateNowPlayingPlayback()
+            }
             return true
         }
         #endif

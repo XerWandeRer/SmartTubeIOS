@@ -748,10 +748,6 @@ extension PlayerView {
             UIDevice.current.endGeneratingDeviceOrientationNotifications()
             // Skip suspend when minimizing to mini-player — playback should continue.
             guard playerState.presentation != .miniPlayer else { return }
-            // Player view is being fully dismissed — release PiP controller so the
-            // next play session creates a fresh one bound to the current playerLayer.
-            pipController = nil
-            pipDelegate = nil
             vm.suspend()
             #else
             vm.suspend()
@@ -770,36 +766,14 @@ extension PlayerView {
             }
         }
         #if os(iOS)
-        // Create the PiP controller the first time the player actually starts
-        // playing — AVPlayer must have a ready item for isPictureInPicturePossible
-        // to ever become true. Creating it at view-appear time (before any item
-        // is loaded) means it stays permanently inert.
-        .onChange(of: vm.isPlaying) { _, playing in
-            let pipUITestingOverride = ProcessInfo.processInfo.arguments.contains("--uitesting-enable-pip")
-            guard playing, pipController == nil,
-                playerLayer.player != nil,
-                store.settings.pipEnabled,
-                pipUITestingOverride || AVPictureInPictureController.isPictureInPictureSupported()
-            else { return }
-            let pip = AVPictureInPictureController(playerLayer: playerLayer)
-            pip?.canStartPictureInPictureAutomaticallyFromInline = true
-            let delegate = PiPDelegate(
-                onActiveChange: { active in
-                    isPiPActive = active
-                    vm.isPictureInPictureActive = active
-                },
-                onDidStart: { vm.updateNowPlayingInfo() }
-            )
-            pip?.delegate = delegate
-            pipDelegate = delegate
-            pipController = pip
+        // The PiP controller lives in PlayerStateStore; create it once the player
+        // has an item (see preparePictureInPicture).
+        .onChange(of: vm.isPlaying, initial: true) { _, playing in
+            guard playing else { return }
+            playerState.preparePictureInPicture(enabled: store.settings.pipEnabled)
         }
-        // When PiP ends (user returns to app), release the stale controller so the
-        // next background exit creates a fresh one attached to the current playerLayer.
-        .onChange(of: isPiPActive) { wasActive, isActive in
-            guard wasActive, !isActive else { return }
-            pipController = nil
-            pipDelegate = nil
+        .onChange(of: store.settings.pipEnabled) { _, enabled in
+            playerState.preparePictureInPicture(enabled: enabled)
         }
         // Update isLandscape when the device physically rotates.
         .onReceive(NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification)) { _ in
@@ -908,8 +882,6 @@ extension PlayerView {
             controlScale: controlScale,
             showMoreMenu: $showMoreMenu,
             channelDestination: $channelDestination,
-            pipController: $pipController,
-            isPiPActive: $isPiPActive,
             isLandscapeLocked: $isLandscapeLocked,
             showQualityPicker: $showQualityPicker,
             showSpeedPicker: $showSpeedPicker,

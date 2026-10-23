@@ -1,5 +1,6 @@
 #if os(iOS)
 import AVFoundation
+import AVKit
 import UIKit
 import Observation
 import SmartTubeIOSCore
@@ -122,6 +123,41 @@ public final class PlayerStateStore {
         if let obs = didBecomeActiveObserver { NotificationCenter.default.removeObserver(obs) }
     }
 
+    // MARK: - Picture in Picture
+
+    /// One controller for the app's lifetime, bound to the persistent layer, so
+    /// automatic PiP works from both the full-screen and the mini player.
+    private(set) var pipController: AVPictureInPictureController?
+    private var pipDelegate: PiPDelegate?
+
+    /// Creates the PiP controller once the player has an item. Creating it before
+    /// any item is loaded leaves isPictureInPicturePossible stuck at false.
+    func preparePictureInPicture(enabled: Bool) {
+        guard enabled else {
+            pipController = nil
+            pipDelegate = nil
+            return
+        }
+        let uiTestingOverride = ProcessInfo.processInfo.arguments.contains("--uitesting-enable-pip")
+        guard pipController == nil, vm.player.currentItem != nil,
+            uiTestingOverride || AVPictureInPictureController.isPictureInPictureSupported()
+        else { return }
+        reattachVideoLayer()
+        let pip = AVPictureInPictureController(playerLayer: playerHostView.playerLayer)
+        pip?.canStartPictureInPictureAutomaticallyFromInline = true
+        let delegate = PiPDelegate(
+            onActiveChange: { [weak self] active in
+                self?.vm.isPictureInPictureActive = active
+                storeLog.notice("[PiP] active=\(active)")
+            },
+            onDidStart: { [weak self] in self?.vm.updateNowPlayingInfo() }
+        )
+        pip?.delegate = delegate
+        pipDelegate = delegate
+        pipController = pip
+        storeLog.notice("[PiP] controller created — possible=\(pip?.isPictureInPicturePossible ?? false)")
+    }
+
     // MARK: - Background playback
 
     /// Detaches the player from the video layer so iOS keeps playing audio in the
@@ -139,9 +175,13 @@ public final class PlayerStateStore {
     }
 
     /// Returning to the app (unlock, app icon, app switcher) brings the video back
-    /// into the player.
+    /// into the player: reattach the layer and close PiP.
     private func handleAppDidBecomeActive() {
         reattachVideoLayer()
+        if let pip = pipController, pip.isPictureInPictureActive {
+            pip.stopPictureInPicture()
+            storeLog.notice("[PiP] app became active — stopping PiP")
+        }
     }
 
     // MARK: - Actions
