@@ -733,6 +733,10 @@ extension PlayerView {
         .onChange(of: store.settings.pipEnabled) { _, enabled in
             playerState.preparePictureInPicture(enabled: enabled)
         }
+        // The default speed can change in Settings while the mini player keeps playing.
+        .onChange(of: store.settings.playbackSpeed) { _, speed in
+            vm.setPlaybackSpeed(speed)
+        }
         // Orientation follows the video, not the sensor — see PlayerOrientationController.
         // vm.isLandscape is layout-only and comes from the actual window geometry.
         .onGeometryChange(for: Bool.self) { proxy in

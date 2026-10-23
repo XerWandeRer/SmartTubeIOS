@@ -101,6 +101,10 @@ extension PlaybackViewModel {
     }
 
     public func setPlaybackSpeed(_ speed: Double) {
+        // Keep our settings copy in sync: resume, quality switches, stall recovery
+        // and the next video all re-apply `settings.playbackSpeed`. Without this
+        // they restore whatever speed was current when the player view appeared.
+        settings.playbackSpeed = speed
         // Setting player.rate to a non-zero value on a paused AVPlayer restarts
         // playback — only apply the rate while actively playing.
         if isPlaying {
