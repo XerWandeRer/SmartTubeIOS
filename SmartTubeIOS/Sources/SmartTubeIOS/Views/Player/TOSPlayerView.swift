@@ -962,7 +962,7 @@ private struct YouTubeWebPlayerView: NSViewRepresentable {
 }
 #else
 /// Hosts the WKWebView inside a container with Auto Layout constraints, mirroring
-/// FullScreenPlayerLayerView's transplant pattern for PersistentPlayerHostView.
+/// the transplant pattern the AVPlayer full-screen player used for PersistentPlayerHostView.
 /// The webView is owned by TOSPlayerViewModel (which outlives this representable's
 /// lifecycle), so when this view is dismissed and TOSMiniPlayerLayerView's container
 /// calls addSubview(webView), UIKit automatically removes it from this container —

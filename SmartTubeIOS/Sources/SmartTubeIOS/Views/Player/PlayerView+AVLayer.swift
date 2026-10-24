@@ -13,39 +13,6 @@ import AppKit
 //
 // Extracted from PlayerView.swift to keep that file under 1 000 lines.
 
-// MARK: - FullScreenPlayerLayerView (iOS)
-
-#if os(iOS)
-/// UIViewRepresentable that embeds the shared PersistentPlayerHostView into the
-/// full-screen player context. UIView.addSubview transplants the hostView from
-/// the mini-player container automatically, keeping the AVPlayerLayer live.
-struct FullScreenPlayerLayerView: UIViewRepresentable {
-    let hostView: PersistentPlayerHostView
-    var videoGravity: AVLayerVideoGravity
-
-    func makeUIView(context: Context) -> UIView {
-        let container = UIView()
-        container.backgroundColor = .black
-        container.isAccessibilityElement = false
-        container.accessibilityElementsHidden = true
-        hostView.videoGravity = videoGravity
-        hostView.translatesAutoresizingMaskIntoConstraints = false
-        container.addSubview(hostView)
-        NSLayoutConstraint.activate([
-            hostView.topAnchor.constraint(equalTo: container.topAnchor),
-            hostView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
-            hostView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            hostView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-        ])
-        return container
-    }
-
-    func updateUIView(_ uiView: UIView, context: Context) {
-        hostView.videoGravity = videoGravity
-    }
-}
-#endif
-
 // MARK: - AVPlayerLayerView
 
 #if os(iOS) || os(tvOS)

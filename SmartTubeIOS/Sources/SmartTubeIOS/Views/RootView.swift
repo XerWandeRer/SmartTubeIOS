@@ -156,26 +156,14 @@ struct MainTabView: View {
 
     var body: some View {
         #if os(iOS)
+        let _ = rootLog.notice(
+            "[MainTabView] body re-render — presentation=\(String(describing: playerState.presentation))"
+        )
         // Read these in body so SwiftUI's @Observable tracker registers the dependency.
         // If only accessed inside the Binding.get closure, changes won't trigger a body re-render
         // and updateUIViewController won't be called, so the cover never dismisses.
-        let fullScreenVideo: Video? = playerState.presentation == .fullScreen ? playerState.currentVideo : nil
-        let _ = rootLog.notice(
-            "[MainTabView] body re-render — presentation=\(String(describing: playerState.presentation)) fullScreenVideo=\(fullScreenVideo?.id ?? "nil")"
-        )
-        let fullScreenBinding = Binding<Video?>(
-            get: { fullScreenVideo },
-            set: { newValue in
-                // Only transition to mini player when the cover is dismissed while
-                // presentation is still .fullScreen. If stop() already moved us to
-                // .hidden, the async onDismiss callback must not resurrect the mini
-                // player by calling minimize() — that is the race condition that
-                // caused the mini-player X button to unexpectedly restore fullscreen.
-                guard newValue == nil, playerState.presentation == .fullScreen else { return }
-                playerState.minimize()
-            }
-        )
-        // TOS full-screen cover binding — mirrors the AVPlayer binding above.
+        //
+        // TOS full-screen cover binding.
         // When the user swipes down or the system dismisses the cover while TOS is
         // still in .fullScreen, this setter calls minimize() so audio continues in
         // TOSMiniPlayerView. If tosState.stop() already moved us to .hidden the
@@ -192,6 +180,11 @@ struct MainTabView: View {
         TabView(selection: $selectedTab) {
             ForEach(AppSection.allCases) { section in
                 NavigationStack { section.destination(api: api) }
+                    #if os(iOS)
+                // Behind the expanded player the tab is covered; keep it out of the
+                // accessibility tree too.
+                .accessibilityHidden(playerState.presentation == .fullScreen)
+                    #endif
                     // Capture the bottom safe-area inset as seen from inside the tab
                     // (UITabBarController sets this to tab-bar height + home-indicator).
                     // The value is propagated up to tabBarBottomInset via PreferenceKey
@@ -244,12 +237,8 @@ struct MainTabView: View {
         .overlay(alignment: .bottom) {
             // Only one mini-player can be active at a time: AVPlayer and TOS are
             // mutually exclusive (onChange stops the other before starting the new one).
-            if playerState.presentation == .miniPlayer {
-                // Floating window; fills the overlay but only the window takes touches.
-                MiniPlayerView(tabBarBottomInset: tabBarBottomInset)
-                .transition(.opacity)
-                .animation(.easeInOut(duration: 0.2), value: playerState.presentation)
-            } else if tosState.presentation == .miniPlayer {
+            // The AVPlayer mini player is part of ResidentPlayerLayer below.
+            if tosState.presentation == .miniPlayer {
                 VStack(spacing: 0) {
                     TOSMiniPlayerView()
                     Color.clear
@@ -260,8 +249,11 @@ struct MainTabView: View {
                 .animation(.easeInOut(duration: 0.2), value: tosState.presentation)
             }
         }
-        .landscapePlayerCover(item: fullScreenBinding, dismissStore: playerState) { video in
-            PlayerView(video: video, api: api)
+        // The AVPlayer player, full screen and mini, is one resident layer above the
+        // tabs (no UIKit presentation). It fills the screen but only takes touches
+        // where it shows something.
+        .overlay {
+            ResidentPlayerLayer(api: api, tabBarBottomInset: tabBarBottomInset)
         }
         // TOS player full-screen cover — presented when tosState.presentation == .fullScreen.
         // TOSPlayerView reads tosState from the environment (injected via AppEntry) so the
