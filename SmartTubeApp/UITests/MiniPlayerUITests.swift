@@ -240,7 +240,8 @@ final class MiniPlayerUITests: XCTestCase {
         moveMiniPlayer(to: .bottomTrailing)
         // Let playback settle first so a starting video cannot flip the label on its own.
         let playing = NSPredicate(format: "label == 'Pause'")
-        _ = XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: playing, object: miniPlayerPlayPause)], timeout: 10)
+        _ = XCTWaiter().wait(
+            for: [XCTNSPredicateExpectation(predicate: playing, object: miniPlayerPlayPause)], timeout: 10)
         let labelBefore = miniPlayerPlayPause.label
 
         let start = miniPlayerPlayPause.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
@@ -391,5 +392,38 @@ final class MiniPlayerUITests: XCTestCase {
         waitForMiniPlayerToSettle()
         XCTAssertEqual(miniPlayerBar.frame.width, 160, accuracy: 2, "Pinching in stops at the minimum width")
         XCTAssertGreaterThan(defaultWidth, 160, "Sanity: the default is larger than the minimum")
+    }
+
+    /// A portrait video opened in the regular player (not the Shorts player) must get an
+    /// upright window instead of being cropped into a 16:9 one.
+    func testPortraitVideoGetsUprightWindow() throws {
+        try XCTSkipIf(Self.skipAllTests, Self.skipReason)
+        // A vertical Short (also in scripts/mytube/regress-list.tsv), opened through the regular player.
+        guard let url = URL(string: "smarttube://video/6yX9tINzYf0") else { return XCTFail("bad URL") }
+        app.open(url)
+        guard playerTitle.waitForExistence(timeout: 15) else {
+            try captureAndSkip("Player did not open from the deep link", in: app)
+        }
+        minimizePlayer()
+        guard miniPlayerBar.waitForExistence(timeout: 5) else {
+            try captureAndSkip("miniPlayer.bar not found", in: app)
+        }
+        // Without playback there is no decoded size to shape the window from.
+        let playing = NSPredicate(format: "label == 'Pause'")
+        let started = XCTWaiter().wait(
+            for: [XCTNSPredicateExpectation(predicate: playing, object: miniPlayerPlayPause)], timeout: 15)
+        guard started == .completed else {
+            try captureAndSkip("The video did not start playing (e.g. YouTube's bot check in the simulator)", in: app)
+        }
+        // The aspect is polled from the player item; give it a moment to reshape.
+        let deadline = Date().addingTimeInterval(10)
+        while Date() < deadline, miniPlayerBar.frame.height <= miniPlayerBar.frame.width {
+            Thread.sleep(forTimeInterval: 0.5)
+        }
+        waitForMiniPlayerToSettle()
+        attachScreenshot("portrait-video-upright-window")
+        let frame = miniPlayerBar.frame
+        XCTAssertGreaterThan(frame.height, frame.width, "A portrait video gets a portrait window")
+        XCTAssertEqual(frame.width / frame.height, 9.0 / 16.0, accuracy: 0.03, "The window is 9:16")
     }
 }

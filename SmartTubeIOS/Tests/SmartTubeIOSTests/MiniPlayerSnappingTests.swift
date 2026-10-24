@@ -166,4 +166,37 @@ struct MiniPlayerSnappingTests {
         let scale = MiniPlayerSnapping.scale(forWidth: 378, screenWidth: 420)
         #expect(near(scale, 2))
     }
+
+    @Test("A portrait video gets the default window turned upright")
+    func portraitWindow() {
+        let portrait = MiniPlayerSnapping.size(screen: screen, obstructions: obstructions, scale: 1, aspect: 9.0 / 16)
+        #expect(portrait == CGSize(width: 106, height: 189))
+    }
+
+    @Test("A portrait window grows at most to half the screen height")
+    func portraitMaximum() {
+        let big = MiniPlayerSnapping.size(screen: screen, obstructions: obstructions, scale: 10, aspect: 9.0 / 16)
+        #expect(big.height <= 912 / 2)
+        #expect(big.height >= 912 / 2 - 2)
+    }
+
+    @Test("A small portrait window keeps a 160 pt long side")
+    func portraitMinimum() {
+        let small = MiniPlayerSnapping.size(screen: screen, obstructions: obstructions, scale: 0.1, aspect: 9.0 / 16)
+        #expect(small == CGSize(width: 90, height: 160))
+    }
+
+    @Test("Extreme aspects are clamped to 9:16 ... 16:9")
+    func aspectIsClamped() {
+        let tall = MiniPlayerSnapping.size(screen: screen, obstructions: obstructions, scale: 1, aspect: 0.2)
+        #expect(tall == CGSize(width: 106, height: 189))
+        let wide = MiniPlayerSnapping.size(screen: screen, obstructions: obstructions, scale: 1, aspect: 5)
+        #expect(wide == size)
+    }
+
+    @Test("A square video gets a square window")
+    func squareWindow() {
+        let square = MiniPlayerSnapping.size(screen: screen, obstructions: obstructions, scale: 1, aspect: 1)
+        #expect(square == CGSize(width: 189, height: 189))
+    }
 }
