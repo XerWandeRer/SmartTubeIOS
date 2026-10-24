@@ -14,8 +14,10 @@ private let miniPlayerLog = CrashlyticsLogger(category: "MiniPlayer")
 ///
 /// - Tap the video to expand back to the full-screen player.
 /// - Drag to move it; it follows the finger 1:1 (rubber-banded at the screen edges)
-///   and on release flies to the corner its projected end point falls in. The corner
-///   is persisted across launches.
+///   and on release flies to the corner its projected end point falls in.
+/// - Pinch to resize, up to the full width or half the screen height.
+///
+/// Corner and size are persisted across launches.
 ///
 /// The view fills the overlay it is placed in, but only the window itself takes
 /// touches; everything around it stays interactive. Geometry lives in
@@ -28,6 +30,8 @@ struct MiniPlayerView: View {
     let tabBarBottomInset: CGFloat
 
     @AppStorage(Self.cornerDefaultsKey) private var storedCorner = MiniPlayerCorner.initial.rawValue
+    /// User-chosen size as a multiple of the default size; clamped when applied.
+    @AppStorage(Self.scaleDefaultsKey) private var storedScale = 1.0
 
     /// Centre (screen coordinates) when the current drag began; nil when not dragging.
     @State private var dragStartCenter: CGPoint?
@@ -40,10 +44,21 @@ struct MiniPlayerView: View {
     /// Bottom safe-area inset including the keyboard: the keyboard's height while it is
     /// shown, otherwise the home-indicator inset.
     @State private var keyboardAwareBottomInset: CGFloat = 0
-    /// Last drag update; taps and button presses right after a drag belong to it.
+    /// Last drag or pinch update; taps and button presses right after one belong to it.
     @State private var lastDragActivity: Date?
+    /// Latest drag translation, kept while a pinch overrides the drag.
+    @State private var lastDragTranslation: CGSize = .zero
+    /// A drag gesture is tracking a finger (even while a pinch overrides it).
+    @State private var isDragTouchActive = false
+    /// Scale when the current pinch began; nil when not pinching.
+    @State private var pinchStartScale: CGFloat?
+    /// Live scale during a pinch.
+    @State private var pinchScale: CGFloat?
+    /// Centre (screen coordinates) kept fixed while pinching.
+    @State private var pinchCenter: CGPoint?
 
     static let cornerDefaultsKey = "miniPlayer.corner"
+    static let scaleDefaultsKey = "miniPlayer.scale"
     private static let dragMinimumDistance: CGFloat = 8
     /// How long after a drag a tap or button release still counts as part of it.
     private static let dragTapSuppression: TimeInterval = 0.35
@@ -68,7 +83,14 @@ struct MiniPlayerView: View {
     private struct Layout: Equatable {
         var screen: CGSize
         var obstructions: MiniPlayerInsets
-        var size: CGSize { MiniPlayerSnapping.size(screenWidth: screen.width) }
+        var scale: CGFloat
+        var size: CGSize { MiniPlayerSnapping.size(screen: screen, obstructions: obstructions, scale: scale) }
+
+        func with(scale: CGFloat) -> Layout {
+            var copy = self
+            copy.scale = scale
+            return copy
+        }
 
         func anchor(_ corner: MiniPlayerCorner) -> CGPoint {
             MiniPlayerSnapping.anchor(for: corner, size: size, screen: screen, obstructions: obstructions)
@@ -103,7 +125,8 @@ struct MiniPlayerView: View {
                         // reports a keyboard-based inset too, so use the keyboard alone.
                         bottom: keyboardShown ? keyboardAwareBottomInset : max(tabBarBottomInset, insets.bottom),
                         trailing: insets.trailing
-                    )
+                    ),
+                    scale: pinchScale ?? storedScale
                 )
                 let anchor = layout.anchor(corner)
 
@@ -114,7 +137,7 @@ struct MiniPlayerView: View {
                     .animation(Self.relayoutAnimation, value: layout)
                     .offset(x: offsetX)
                     .offset(y: offsetY)
-                    .highPriorityGesture(dragGesture(layout: layout))
+                    .highPriorityGesture(dragGesture(layout: layout).simultaneously(with: pinchGesture(layout: layout)))
                     // Same level as the drag: a tap gesture inside the window would be
                     // blocked by the high-priority drag even when the drag never starts.
                     .simultaneousGesture(
@@ -220,6 +243,10 @@ struct MiniPlayerView: View {
         DragGesture(minimumDistance: Self.dragMinimumDistance, coordinateSpace: .global)
             .onChanged { value in
                 lastDragActivity = .now
+                isDragTouchActive = true
+                lastDragTranslation = value.translation
+                // A pinch owns the window while it lasts.
+                guard pinchStartScale == nil else { return }
                 let anchor = layout.anchor(corner)
                 let start: CGPoint
                 if let dragStartCenter {
@@ -246,42 +273,107 @@ struct MiniPlayerView: View {
             }
             .onEnded { value in
                 lastDragActivity = .now
+                isDragTouchActive = false
                 dragStartCenter = nil
-                let oldAnchor = layout.anchor(corner)
-                let center = CGPoint(x: oldAnchor.x + offsetX, y: oldAnchor.y + offsetY)
-                let velocity = CGVector(dx: value.velocity.width, dy: value.velocity.height)
-                let target = MiniPlayerSnapping.targetCorner(
-                    releasedAt: center, velocity: velocity, screen: layout.screen)
-                let newAnchor = layout.anchor(target)
-                miniPlayerLog.debug(
-                    "snap \(corner.rawValue) → \(target.rawValue) center=\(center) velocity=\(velocity)")
+                // The pinch settles the window when it ends.
+                guard pinchStartScale == nil else { return }
+                settle(layout: layout, velocity: CGVector(dx: value.velocity.width, dy: value.velocity.height))
+            }
+    }
 
-                // Re-base the offset on the target corner without moving the window,
-                // then let each axis spring back to zero.
+    /// Pinch to resize between `MiniPlayerSnapping.minimumWidth` and
+    /// `maximumWidth` (full width or half the screen height). The centre stays put
+    /// while pinching; on release the window snaps to the nearest corner at its new size.
+    private func pinchGesture(layout: Layout) -> some Gesture {
+        MagnifyGesture()
+            .onChanged { value in
+                lastDragActivity = .now
+                let start: CGFloat
+                let center: CGPoint
+                if let pinchStartScale, let pinchCenter {
+                    start = pinchStartScale
+                    center = pinchCenter
+                } else {
+                    // Start from the size on screen (the stored scale may be clamped).
+                    start = MiniPlayerSnapping.scale(forWidth: layout.size.width, screenWidth: layout.screen.width)
+                    let anchor = layout.anchor(corner)
+                    center = CGPoint(x: anchor.x + offsetX, y: anchor.y + offsetY)
+                    pinchStartScale = start
+                    pinchCenter = center
+                    withAnimation(liftAnimation) { isLifted = true }
+                }
+                let resized = layout.with(scale: start * value.magnification)
+                let anchor = resized.anchor(corner)
                 var transaction = Transaction()
                 transaction.disablesAnimations = true
                 withTransaction(transaction) {
-                    storedCorner = target.rawValue
-                    offsetX = center.x - newAnchor.x
-                    offsetY = center.y - newAnchor.y
-                }
-                withAnimation(snapAnimation(velocity: velocity.dx, distance: -offsetX)) {
-                    offsetX = 0
-                }
-                withAnimation(snapAnimation(velocity: velocity.dy, distance: -offsetY)) {
-                    offsetY = 0
-                } completion: {
-                    // A new drag may have begun before this snap settled.
-                    guard dragStartCenter == nil else { return }
-                    withAnimation(liftAnimation) { isLifted = false }
+                    pinchScale = resized.scale
+                    offsetX = center.x - anchor.x
+                    offsetY = center.y - anchor.y
                 }
             }
+            .onEnded { _ in
+                lastDragActivity = .now
+                let resized = layout.with(scale: pinchScale ?? storedScale)
+                let committed = MiniPlayerSnapping.scale(
+                    forWidth: resized.size.width, screenWidth: resized.screen.width)
+                let finalLayout = layout.with(scale: committed)
+                let center = CGPoint(x: resized.anchor(corner).x + offsetX, y: resized.anchor(corner).y + offsetY)
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    storedScale = Double(committed)
+                    pinchScale = nil
+                    pinchStartScale = nil
+                    pinchCenter = nil
+                    let anchor = finalLayout.anchor(corner)
+                    offsetX = center.x - anchor.x
+                    offsetY = center.y - anchor.y
+                }
+                miniPlayerLog.debug("pinch → scale=\(committed) width=\(finalLayout.size.width)")
+                if isDragTouchActive {
+                    // A finger is still down: let the drag carry on from here.
+                    dragStartCenter = CGPoint(
+                        x: center.x - lastDragTranslation.width, y: center.y - lastDragTranslation.height)
+                } else {
+                    settle(layout: finalLayout, velocity: .zero)
+                }
+            }
+    }
+
+    /// Flies to the corner the release projects into, springing from `velocity`.
+    private func settle(layout: Layout, velocity: CGVector) {
+        let oldAnchor = layout.anchor(corner)
+        let center = CGPoint(x: oldAnchor.x + offsetX, y: oldAnchor.y + offsetY)
+        let target = MiniPlayerSnapping.targetCorner(releasedAt: center, velocity: velocity, screen: layout.screen)
+        let newAnchor = layout.anchor(target)
+        miniPlayerLog.debug("snap \(corner.rawValue) → \(target.rawValue) center=\(center) velocity=\(velocity)")
+
+        // Re-base the offset on the target corner without moving the window,
+        // then let each axis spring back to zero.
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            storedCorner = target.rawValue
+            offsetX = center.x - newAnchor.x
+            offsetY = center.y - newAnchor.y
+        }
+        withAnimation(snapAnimation(velocity: velocity.dx, distance: -offsetX)) {
+            offsetX = 0
+        }
+        withAnimation(snapAnimation(velocity: velocity.dy, distance: -offsetY)) {
+            offsetY = 0
+        } completion: {
+            // A new drag or pinch may have begun before this snap settled.
+            guard dragStartCenter == nil, pinchStartScale == nil else { return }
+            withAnimation(liftAnimation) { isLifted = false }
+        }
     }
 
     /// Runs `action` only if the current touch is a tap, not the end of a drag. The
     /// tap/button and the drag can end in either order, hence both checks.
     private func unlessDragging(_ action: () -> Void) {
-        if dragStartCenter != nil { return }
+        if dragStartCenter != nil || pinchStartScale != nil { return }
         if let lastDragActivity, Date.now.timeIntervalSince(lastDragActivity) < Self.dragTapSuppression { return }
         action()
     }

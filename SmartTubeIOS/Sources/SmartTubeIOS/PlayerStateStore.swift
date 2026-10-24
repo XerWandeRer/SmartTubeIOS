@@ -108,6 +108,11 @@ public final class PlayerStateStore {
         hostView.playerLayer.player = vm.player
         self.playerHostView = hostView
         vm.onSystemBackgroundPause = { [weak self] in self?.detachVideoLayerForBackground() }
+        // UI tests start the mini player from its defaults (corner and size are persisted).
+        if ProcessInfo.processInfo.arguments.contains("--uitesting-reset-mini-player") {
+            UserDefaults.standard.removeObject(forKey: MiniPlayerView.cornerDefaultsKey)
+            UserDefaults.standard.removeObject(forKey: MiniPlayerView.scaleDefaultsKey)
+        }
         didBecomeActiveObserver = NotificationCenter.default.addObserver(
             forName: UIApplication.didBecomeActiveNotification,
             object: nil,

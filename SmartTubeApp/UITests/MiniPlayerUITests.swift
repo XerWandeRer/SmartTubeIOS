@@ -15,11 +15,13 @@ final class MiniPlayerUITests: XCTestCase {
     private static var sharedApp: XCUIApplication!
     private static var skipAllTests = false
     private static let skipReason = "Home feed did not load — network unavailable or feed empty"
+    /// Clears the persisted corner and size at launch.
+    private static let resetArgument = "--uitesting-reset-mini-player"
 
     override static func setUp() {
         super.setUp()
         let app = XCUIApplication()
-        app.launchArguments = ["--uitesting", "--uitesting-disable-tos-player-on-ios"]
+        app.launchArguments = ["--uitesting", "--uitesting-disable-tos-player-on-ios", Self.resetArgument]
         app.launch()
         sharedApp = app
         UITestHelpers.tapTab(named: "Home", in: app)
@@ -260,6 +262,10 @@ final class MiniPlayerUITests: XCTestCase {
         XCTAssertEqual(currentCorner(), .topLeading)
 
         app.terminate()
+        // Relaunch without the reset so the stored corner survives.
+        let arguments = app.launchArguments
+        app.launchArguments = arguments.filter { $0 != Self.resetArgument }
+        defer { app.launchArguments = arguments }
         app.launch()
         UITestHelpers.tapTab(named: "Home", in: app)
         try showMiniPlayer()
@@ -358,5 +364,32 @@ final class MiniPlayerUITests: XCTestCase {
         // The middle of the video, clear of both buttons.
         miniPlayerBar.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         XCTAssertTrue(playerTitle.waitForExistence(timeout: 5), "Tapping the video expands to the full-screen player")
+    }
+
+    func testPinchResizesBetweenMinimumAndFullWidth() throws {
+        try XCTSkipIf(Self.skipAllTests, Self.skipReason)
+        try showMiniPlayer()
+        moveMiniPlayer(to: .bottomTrailing)
+        let screen = screenFrame
+        let defaultWidth = miniPlayerBar.frame.width
+
+        miniPlayerBar.pinch(withScale: 4, velocity: 2)
+        waitForMiniPlayerToSettle()
+        attachScreenshot("pinched-to-maximum")
+        let maximum = min(screen.width - 24, (screen.height / 2 * 16 / 9).rounded(.down))
+        XCTAssertEqual(miniPlayerBar.frame.width, maximum, accuracy: 2, "Pinching out stops at the full width")
+        XCTAssertLessThanOrEqual(miniPlayerBar.frame.height, screen.height / 2 + 1, "Never taller than half the screen")
+        XCTAssertEqual(currentCorner(), .bottomTrailing, "Resizing keeps the corner")
+        XCTAssertFalse(playerTitle.exists, "Pinching must not expand the player")
+
+        // The size survives closing the mini player and minimizing again.
+        miniPlayerClose.tap()
+        try showMiniPlayer()
+        XCTAssertEqual(miniPlayerBar.frame.width, maximum, accuracy: 2, "The chosen size is remembered")
+
+        miniPlayerBar.pinch(withScale: 0.2, velocity: -2)
+        waitForMiniPlayerToSettle()
+        XCTAssertEqual(miniPlayerBar.frame.width, 160, accuracy: 2, "Pinching in stops at the minimum width")
+        XCTAssertGreaterThan(defaultWidth, 160, "Sanity: the default is larger than the minimum")
     }
 }
