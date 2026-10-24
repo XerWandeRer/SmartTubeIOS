@@ -1,5 +1,6 @@
 import AVFoundation
 import AVKit
+import SmartTubeIOSCore
 import SwiftUI
 
 #if canImport(UIKit)
@@ -119,25 +120,20 @@ struct HoldSpeedBadge: View {
     }
 }
 
-// MARK: - SwipeGestureOverlay (horizontal)
+// MARK: - PlayerSwipeGestureOverlay (taps)
 
 #if os(iOS)
-/// Left swipe → `onSwipeLeft`, right swipe → `onSwipeRight`, tap → `onTap`.
-/// Set `isEnabled = false` (e.g. while the progress slider is being scrubbed) to
-/// temporarily suppress pan recognition so the scrub drag is not mistaken for a swipe.
+/// Tap → `onTap`, double tap, two-finger tap and long press over the video. Pans
+/// belong to `PlayerPanGestureInstaller`. Set `isEnabled = false` (e.g. while the
+/// progress slider is being scrubbed) to suppress the taps and the long press.
 /// Named `PlayerSwipeGestureOverlay` to avoid a module-level clash with the
 /// identically-structured private copy in `ShortsPlayerView.swift`.
 struct PlayerSwipeGestureOverlay: UIViewRepresentable {
-    var onSwipeLeft: () -> Void
-    var onSwipeRight: () -> Void
     var onTap: () -> Void
     var onDoubleTap: (CGFloat) -> Void = { _ in }
     var onTwoFingerTap: () -> Void = {}
-    var onPanChanged: ((CGFloat) -> Void)?
-    var onSwipeCancelled: (() -> Void)?
     var onLongPressStart: (() -> Void)?
     var onLongPressEnd: (() -> Void)?
-    var onSwipeDown: (() -> Void)? = nil
     var isEnabled: Bool = true
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -146,19 +142,11 @@ struct PlayerSwipeGestureOverlay: UIViewRepresentable {
         let view = UIView()
         view.backgroundColor = .clear
 
-        let pan = UIPanGestureRecognizer(
-            target: context.coordinator,
-            action: #selector(Coordinator.handlePan(_:)))
-        pan.cancelsTouchesInView = true
-        view.addGestureRecognizer(pan)
-        context.coordinator.pan = pan
-
         let doubleTap = UITapGestureRecognizer(
             target: context.coordinator,
             action: #selector(Coordinator.handleDoubleTap(_:)))
         doubleTap.numberOfTapsRequired = 2
         doubleTap.cancelsTouchesInView = false
-        doubleTap.require(toFail: pan)
         view.addGestureRecognizer(doubleTap)
         context.coordinator.doubleTap = doubleTap
 
@@ -166,7 +154,6 @@ struct PlayerSwipeGestureOverlay: UIViewRepresentable {
             target: context.coordinator,
             action: #selector(Coordinator.handleTap))
         tap.cancelsTouchesInView = false
-        tap.require(toFail: pan)
         tap.require(toFail: doubleTap)
         view.addGestureRecognizer(tap)
         context.coordinator.tap = tap
@@ -191,7 +178,6 @@ struct PlayerSwipeGestureOverlay: UIViewRepresentable {
 
     func updateUIView(_ uiView: UIView, context: Context) {
         context.coordinator.parent = self
-        context.coordinator.pan?.isEnabled = isEnabled
         context.coordinator.tap?.isEnabled = isEnabled
         context.coordinator.doubleTap?.isEnabled = isEnabled
         context.coordinator.longPress?.isEnabled = isEnabled
@@ -199,38 +185,10 @@ struct PlayerSwipeGestureOverlay: UIViewRepresentable {
 
     final class Coordinator: NSObject {
         var parent: PlayerSwipeGestureOverlay
-        weak var pan: UIPanGestureRecognizer?
         weak var tap: UITapGestureRecognizer?
         weak var doubleTap: UITapGestureRecognizer?
         weak var longPress: UILongPressGestureRecognizer?
-        private let minDistance: CGFloat = 40
-
         init(_ parent: PlayerSwipeGestureOverlay) { self.parent = parent }
-
-        @MainActor @objc func handlePan(_ gr: UIPanGestureRecognizer) {
-            let t = gr.translation(in: gr.view)
-            switch gr.state {
-            case .changed:
-                // Only forward horizontal pan for slide-offset animation.
-                if abs(t.x) >= abs(t.y) { parent.onPanChanged?(t.x) }
-            case .ended:
-                // Swipe-down: vertical-dominant, downward, meets threshold → minimize
-                if abs(t.y) > minDistance, t.y > 0, abs(t.y) > abs(t.x) {
-                    parent.onSwipeCancelled?()  // reset any horizontal offset
-                    parent.onSwipeDown?()
-                    return
-                }
-                guard abs(t.x) > minDistance, abs(t.x) > abs(t.y) else {
-                    parent.onSwipeCancelled?()
-                    return
-                }
-                if t.x < 0 { parent.onSwipeLeft() } else { parent.onSwipeRight() }
-            case .cancelled, .failed:
-                parent.onSwipeCancelled?()
-            default:
-                break
-            }
-        }
 
         @MainActor @objc func handleTap() { parent.onTap() }
         @MainActor @objc func handleDoubleTap(_ gr: UITapGestureRecognizer) {
@@ -249,6 +207,114 @@ struct PlayerSwipeGestureOverlay: UIViewRepresentable {
             default:
                 break
             }
+        }
+    }
+}
+
+// MARK: - PlayerPanGestureInstaller
+
+/// The full-screen player's single pan: horizontal for the previous / next video,
+/// downward to collapse into the mini player. It is installed on the root view, so it
+/// also sees touches that land on the controls, and replaces both the pan that lived
+/// in PlayerSwipeGestureOverlay and the controls' SwiftUI drag.
+///
+/// The axis is locked on the first movement (`PlayerPanGesture.axis`). Touches on a
+/// UIControl never start it, and it does not begin while `isEnabled` is false
+/// (scrubbing, menus). A cancelled or failed pan still ends, so a drag always settles.
+struct PlayerPanGestureInstaller: UIViewRepresentable {
+    var isEnabled: Bool
+    /// Axis and translation from touch-down.
+    var onChanged: (PlayerPanAxis, CGPoint) -> Void
+    /// Axis, translation and velocity (points per second). `cancelled` is true when the
+    /// system cancelled the pan or it failed; the velocity is zero then.
+    var onEnded: (_ axis: PlayerPanAxis, _ translation: CGPoint, _ velocity: CGPoint, _ cancelled: Bool) -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    func makeUIView(context: Context) -> InstallerView {
+        let view = InstallerView()
+        view.isUserInteractionEnabled = false
+        view.coordinator = context.coordinator
+        return view
+    }
+
+    func updateUIView(_ uiView: InstallerView, context: Context) {
+        context.coordinator.parent = self
+    }
+
+    static func dismantleUIView(_ uiView: InstallerView, coordinator: Coordinator) {
+        coordinator.uninstall()
+    }
+
+    /// Zero-size marker view: once in a window it installs the pan on the root view.
+    final class InstallerView: UIView {
+        weak var coordinator: Coordinator?
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            if let window {
+                coordinator?.install(on: window.rootViewController?.view ?? window)
+            } else {
+                coordinator?.uninstall()
+            }
+        }
+    }
+
+    @MainActor
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        var parent: PlayerPanGestureInstaller
+        private var pan: UIPanGestureRecognizer?
+        private var axis: PlayerPanAxis?
+
+        init(_ parent: PlayerPanGestureInstaller) { self.parent = parent }
+
+        func install(on view: UIView) {
+            guard pan?.view !== view else { return }
+            uninstall()
+            let pan = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
+            pan.maximumNumberOfTouches = 1
+            pan.cancelsTouchesInView = true
+            pan.delegate = self
+            view.addGestureRecognizer(pan)
+            self.pan = pan
+        }
+
+        func uninstall() {
+            if let pan { pan.view?.removeGestureRecognizer(pan) }
+            pan = nil
+            axis = nil
+        }
+
+        @objc func handlePan(_ gr: UIPanGestureRecognizer) {
+            let translation = gr.translation(in: gr.view)
+            switch gr.state {
+            case .began, .changed:
+                if axis == nil {
+                    axis = PlayerPanGesture.axis(for: CGVector(dx: translation.x, dy: translation.y))
+                }
+                if let axis { parent.onChanged(axis, translation) }
+            case .ended:
+                if let axis { parent.onEnded(axis, translation, gr.velocity(in: gr.view), false) }
+                axis = nil
+            case .cancelled, .failed:
+                if let axis { parent.onEnded(axis, translation, .zero, true) }
+                axis = nil
+            default:
+                break
+            }
+        }
+
+        func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+            parent.isEnabled
+        }
+
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+            var view = touch.view
+            while let current = view {
+                if current is UIControl { return false }
+                view = current.superview
+            }
+            return true
         }
     }
 }

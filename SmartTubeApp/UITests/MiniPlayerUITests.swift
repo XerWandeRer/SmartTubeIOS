@@ -465,4 +465,105 @@ extension MiniPlayerUITests {
         XCTAssertFalse(playerTitle.exists, "player.titleLabel must not be visible in the mini player")
         XCTAssertFalse(backButton.exists, "player.backButton must not be visible in the mini player")
     }
+
+    // MARK: Collapse drag (XER-14 step 3)
+    //
+    // In portrait the expanded player follows a downward drag and the release decides:
+    // the projected end point (UIScrollView deceleration) below half of the fixed
+    // travel (40 % of the screen height) collapses, otherwise it springs back.
+
+    /// Opens a video and makes sure the window is portrait (16:9 videos open in
+    /// landscape; the orientation button flips them).
+    private func openPortraitPlayer() throws {
+        try openPlayerFromHome()
+        let window = app.windows.firstMatch
+        guard window.frame.width > window.frame.height else { return }
+        let rotate = app.buttons["player.landscapeLockButton"].firstMatch
+        if !rotate.exists {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
+        }
+        guard rotate.waitForExistence(timeout: 3) else {
+            try captureAndSkip("player.landscapeLockButton not found — cannot switch to portrait", in: app)
+        }
+        rotate.tap()
+        let portrait = XCTNSPredicateExpectation(
+            predicate: NSPredicate { _, _ in window.frame.height > window.frame.width }, object: nil)
+        guard XCTWaiter().wait(for: [portrait], timeout: 5) == .completed else {
+            try captureAndSkip("Window did not rotate to portrait", in: app)
+        }
+    }
+
+    /// Drags from the upper part of the video (clear of the controls) by `offset`.
+    private func dragPlayer(by offset: CGVector, velocity: CGFloat, hold: TimeInterval) {
+        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3))
+        start.press(
+            forDuration: 0.05,
+            thenDragTo: start.withOffset(offset),
+            withVelocity: XCUIGestureVelocity(velocity),
+            thenHoldForDuration: hold
+        )
+    }
+
+    private func assertStaysExpanded(_ message: String) {
+        XCTAssertFalse(miniPlayerBar.waitForExistence(timeout: 2), message)
+        XCTAssertTrue(playerTitle.exists, message)
+    }
+
+    func testSlowShortDragSpringsBack() throws {
+        try XCTSkipIf(Self.skipAllTests, Self.skipReason)
+        try openPortraitPlayer()
+        dragPlayer(by: CGVector(dx: 0, dy: 80), velocity: 200, hold: 0.3)
+        assertStaysExpanded("A slow release before half the travel springs back to full screen")
+    }
+
+    func testSlowLongDragCollapses() throws {
+        try XCTSkipIf(Self.skipAllTests, Self.skipReason)
+        try openPortraitPlayer()
+        let height = app.windows.firstMatch.frame.height
+        dragPlayer(by: CGVector(dx: 0, dy: height * 0.3), velocity: 300, hold: 0.3)
+        XCTAssertTrue(miniPlayerBar.waitForExistence(timeout: 5), "A slow release past half the travel collapses")
+        XCTAssertFalse(playerTitle.exists, "The full-screen controls are gone in the mini player")
+    }
+
+    func testShortFlingCollapses() throws {
+        try XCTSkipIf(Self.skipAllTests, Self.skipReason)
+        try openPortraitPlayer()
+        dragPlayer(by: CGVector(dx: 0, dy: 80), velocity: 2000, hold: 0)
+        XCTAssertTrue(miniPlayerBar.waitForExistence(timeout: 5), "A quick fling collapses after a short drag")
+    }
+
+    func testCollapseDragWorksWithControlsShown() throws {
+        try XCTSkipIf(Self.skipAllTests, Self.skipReason)
+        try openPortraitPlayer()
+        if !backButton.isHittable || !app.buttons["player.landscapeLockButton"].exists {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
+        }
+        dragPlayer(by: CGVector(dx: 0, dy: 80), velocity: 2000, hold: 0)
+        XCTAssertTrue(
+            miniPlayerBar.waitForExistence(timeout: 5), "The same drag collapses while the controls are visible")
+    }
+
+    func testHorizontalDragDoesNotCollapse() throws {
+        try XCTSkipIf(Self.skipAllTests, Self.skipReason)
+        try openPortraitPlayer()
+        dragPlayer(by: CGVector(dx: -160, dy: 40), velocity: 800, hold: 0)
+        assertStaysExpanded("A horizontal drag changes the video, never collapses")
+    }
+
+    func testScrubbingWithVerticalJitterDoesNotCollapse() throws {
+        try XCTSkipIf(Self.skipAllTests, Self.skipReason)
+        try openPortraitPlayer()
+        let progressBar = app.otherElements["player.progressBar"].firstMatch
+        if !progressBar.exists {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
+        }
+        guard progressBar.waitForExistence(timeout: 3) else {
+            try captureAndSkip("player.progressBar not found", in: app)
+        }
+        let start = progressBar.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5))
+        start.press(
+            forDuration: 0.1, thenDragTo: start.withOffset(CGVector(dx: 90, dy: 70)),
+            withVelocity: XCUIGestureVelocity(600), thenHoldForDuration: 0.2)
+        assertStaysExpanded("Dragging the progress bar only seeks, even with a vertical component")
+    }
 }

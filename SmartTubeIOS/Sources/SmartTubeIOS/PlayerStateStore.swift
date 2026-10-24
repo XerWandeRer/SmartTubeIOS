@@ -80,6 +80,10 @@ public final class PlayerStateStore {
         vm.isLoading ? vm.history.last : currentVideo
     }
 
+    /// Horizontal offset of PlayerView's previous / next slide; ResidentPlayerLayer
+    /// moves the video by the same amount.
+    var slideOffset: CGFloat = 0
+
     // MARK: - Video size
 
     /// Decoded size of a video, reported once AVPlayer knows it.
