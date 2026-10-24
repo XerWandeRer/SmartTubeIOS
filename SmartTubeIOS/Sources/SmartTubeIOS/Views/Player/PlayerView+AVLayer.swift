@@ -72,10 +72,16 @@ struct PlayerAVLayerView: UIViewRepresentable {
 final class PiPDelegate: NSObject, AVPictureInPictureControllerDelegate {
     private let onActiveChange: (Bool) -> Void
     private let onDidStart: (() -> Void)?
+    private let onRestore: (() -> Void)?
 
-    init(onActiveChange: @escaping (Bool) -> Void, onDidStart: (() -> Void)? = nil) {
+    init(
+        onActiveChange: @escaping (Bool) -> Void,
+        onDidStart: (() -> Void)? = nil,
+        onRestore: (() -> Void)? = nil
+    ) {
         self.onActiveChange = onActiveChange
         self.onDidStart = onDidStart
+        self.onRestore = onRestore
     }
 
     func pictureInPictureControllerDidStartPictureInPicture(_ controller: AVPictureInPictureController) {
@@ -95,9 +101,10 @@ final class PiPDelegate: NSObject, AVPictureInPictureControllerDelegate {
         _ controller: AVPictureInPictureController,
         restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler: @escaping (Bool) -> Void
     ) {
-        // The AVPlayerLayer is always present and visible in PlayerView, so the
+        // The AVPlayerLayer never leaves the window (ResidentPlayerLayer), so the
         // UI is immediately ready. Calling completionHandler(true) right away
         // lets AVKit animate the video seamlessly back into the layer.
+        onRestore?()
         completionHandler(true)
     }
 }
