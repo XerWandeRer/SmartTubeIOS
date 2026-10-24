@@ -161,6 +161,9 @@ public final class PlayerStateStore {
     /// automatic PiP works from both the full-screen and the mini player.
     private(set) var pipController: AVPictureInPictureController?
     private var pipDelegate: PiPDelegate?
+    /// The app is closing PiP itself because it became active (app icon, app switcher,
+    /// unlock); the player then stays as it was before PiP.
+    @ObservationIgnored private var isStoppingPictureInPictureForActivation = false
 
     /// Creates the PiP controller once the player has an item. Creating it before
     /// any item is loaded leaves isPictureInPicturePossible stuck at false.
@@ -180,14 +183,27 @@ public final class PlayerStateStore {
         let delegate = PiPDelegate(
             onActiveChange: { [weak self] active in
                 self?.vm.isPictureInPictureActive = active
+                if !active { self?.isStoppingPictureInPictureForActivation = false }
                 storeLog.notice("[PiP] active=\(active)")
             },
-            onDidStart: { [weak self] in self?.vm.updateNowPlayingInfo() }
+            onDidStart: { [weak self] in self?.vm.updateNowPlayingInfo() },
+            onRestore: { [weak self] in self?.restoreFromPictureInPicture() }
         )
         pip?.delegate = delegate
         pipDelegate = delegate
         pipController = pip
         storeLog.notice("[PiP] controller created — possible=\(pip?.isPictureInPicturePossible ?? false)")
+    }
+
+    /// AVKit hands the video back from PiP. The PiP window's restore button opens the
+    /// full-screen player (like YouTube); a stop the app asked for on activation keeps
+    /// the full-screen or mini player that was showing before PiP.
+    private func restoreFromPictureInPicture() {
+        let byActivation = isStoppingPictureInPictureForActivation
+        storeLog.notice(
+            "[PiP] restore — byActivation=\(byActivation) presentation=\(String(describing: self.presentation))")
+        guard !byActivation, presentation == .miniPlayer else { return }
+        expand()
     }
 
     // MARK: - Background playback
@@ -211,6 +227,7 @@ public final class PlayerStateStore {
     private func handleAppDidBecomeActive() {
         reattachVideoLayer()
         if let pip = pipController, pip.isPictureInPictureActive {
+            isStoppingPictureInPictureForActivation = true
             pip.stopPictureInPicture()
             storeLog.notice("[PiP] app became active — stopping PiP")
         }
