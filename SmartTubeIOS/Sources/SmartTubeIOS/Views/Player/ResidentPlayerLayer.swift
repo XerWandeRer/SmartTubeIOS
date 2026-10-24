@@ -16,7 +16,8 @@ private let residentLog = CrashlyticsLogger(category: "ResidentPlayer")
 ///
 /// Full screen: a black backdrop, the video, and PlayerView's controls on top.
 ///
-/// Mini player: a rounded 16:9 window with the live video, a play/pause and a close
+/// Mini player: a rounded window shaped like the video (16:9, or upright 9:16 for
+/// portrait videos) with the live video, a play/pause and a close
 /// button. Everything around it stays interactive.
 /// - Tap the video to expand back to full screen.
 /// - Drag to move it; it follows the finger 1:1 (rubber-banded at the screen edges)
@@ -85,6 +86,8 @@ struct ResidentPlayerLayer: View {
     private static let relayoutAnimation = Animation.spring(response: 0.35, dampingFraction: 0.8)
     private static let gravityAnimation = Animation.easeInOut(duration: 0.25)
     private static let controlsFade = Animation.easeOut(duration: 0.15)
+    private static let videoSizePollAttempts = 120
+    private static let videoSizePollInterval = Duration.milliseconds(250)
     /// Longest wait for the rotation back to portrait before collapsing anyway.
     private static let portraitWaitTimeout: Duration = .seconds(1.5)
     /// The window takes its portrait size when the rotation starts; the system's
@@ -124,7 +127,12 @@ struct ResidentPlayerLayer: View {
         var screen: CGSize
         var obstructions: MiniPlayerInsets
         var scale: CGFloat
-        var size: CGSize { MiniPlayerSnapping.size(screen: screen, obstructions: obstructions, scale: scale) }
+        /// Video width / height; the mini player takes the same shape (9:16 ... 16:9).
+        var aspect: CGFloat
+        var size: CGSize {
+            MiniPlayerSnapping.size(screen: screen, obstructions: obstructions, scale: scale, aspect: aspect)
+        }
+        var longSide: CGFloat { max(size.width, size.height) }
 
         func with(scale: CGFloat) -> Layout {
             var copy = self
@@ -174,6 +182,9 @@ struct ResidentPlayerLayer: View {
         .onChange(of: playerState.presentation) { _, presentation in
             presentationChanged(presentation)
         }
+        // The player item's size is not observable, and PlayerView (which reports it
+        // too) is not mounted in the mini player: poll per video until it is known.
+        .task(id: playerState.vm.currentVideoId) { await pollVideoSize() }
         .onChange(of: screenSize) { _, size in
             guard isWaitingForPortrait, size.height > size.width else { return }
             Task { @MainActor in
@@ -220,6 +231,22 @@ struct ResidentPlayerLayer: View {
 
     private var transitionAnimation: Animation {
         reduceMotion ? Self.reducedMotionAnimation : .spring(Self.presentationSpring)
+    }
+
+    private func pollVideoSize() async {
+        let vm = playerState.vm
+        guard let videoID = vm.currentVideoId, playerState.videoSize?.videoID != videoID else { return }
+        for _ in 0..<Self.videoSizePollAttempts {
+            if Task.isCancelled { return }
+            if !vm.isLoading, vm.currentVideoId == videoID,
+                let size = vm.player.currentItem?.presentationSize, size.width > 0, size.height > 0
+            {
+                withAnimation(Self.relayoutAnimation) { playerState.videoSizeKnown(videoID: videoID, size: size) }
+                residentLog.debug("video size \(Int(size.width))x\(Int(size.height)) id=\(videoID)")
+                return
+            }
+            try? await Task.sleep(for: Self.videoSizePollInterval)
+        }
     }
 
     private func finishLandscapeCollapse(reason: String) {
@@ -305,7 +332,8 @@ struct ResidentPlayerLayer: View {
                         bottom: keyboardShown ? keyboardAwareBottomInset : max(tabBarBottomInset, insets.bottom),
                         trailing: insets.trailing
                     ),
-                    scale: pinchScale ?? storedScale
+                    scale: pinchScale ?? storedScale,
+                    aspect: playerState.videoAspectRatio
                 )
                 let fill = store.settings.videoGravityMode == .fill
 
@@ -491,7 +519,7 @@ extension ResidentPlayerLayer {
                     center = pinchCenter
                 } else {
                     // Start from the size on screen (the stored scale may be clamped).
-                    start = MiniPlayerSnapping.scale(forWidth: layout.size.width, screenWidth: layout.screen.width)
+                    start = MiniPlayerSnapping.scale(forLongSide: layout.longSide, screenWidth: layout.screen.width)
                     let anchor = layout.anchor(corner)
                     center = CGPoint(x: anchor.x + offsetX, y: anchor.y + offsetY)
                     pinchStartScale = start
@@ -512,7 +540,7 @@ extension ResidentPlayerLayer {
                 lastDragActivity = .now
                 let resized = layout.with(scale: pinchScale ?? storedScale)
                 let committed = MiniPlayerSnapping.scale(
-                    forWidth: resized.size.width, screenWidth: resized.screen.width)
+                    forLongSide: resized.longSide, screenWidth: resized.screen.width)
                 let finalLayout = layout.with(scale: committed)
                 let center = CGPoint(x: resized.anchor(corner).x + offsetX, y: resized.anchor(corner).y + offsetY)
                 var transaction = Transaction()
