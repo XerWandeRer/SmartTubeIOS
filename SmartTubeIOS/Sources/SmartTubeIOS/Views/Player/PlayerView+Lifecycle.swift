@@ -534,9 +534,9 @@ extension PlayerView {
             tvosPlayerChangeModifiers
                 .toolbar(.hidden, for: .tabBar)
             #elseif os(iOS)
+            // ResidentPlayerLayer hides the status bar and home indicator by progress.
             playerContentView
                 .navigationBarHidden(true)
-                .statusBarHidden(true)
                 .toolbar(.hidden, for: .tabBar)
             #else
             playerContentView
