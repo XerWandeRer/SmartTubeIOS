@@ -9,7 +9,8 @@ private let miniPlayerLog = CrashlyticsLogger(category: "MiniPlayer")
 // MARK: - MiniPlayerView
 
 /// YouTube-style floating mini player shown over MainTabView when the player is
-/// minimized: a rounded 16:9 window with the live video (the shared
+/// minimized: a rounded window shaped like the video (16:9 for landscape videos,
+/// upright 9:16 for portrait ones) with the live video (the shared
 /// PersistentPlayerHostView), a play/pause and a close button.
 ///
 /// - Tap the video to expand back to the full-screen player.
@@ -56,6 +57,13 @@ struct MiniPlayerView: View {
     @State private var pinchScale: CGFloat?
     /// Centre (screen coordinates) kept fixed while pinching.
     @State private var pinchCenter: CGPoint?
+    /// Aspect ratio (width / height) of the decoded video, once the player reports it.
+    @State private var decodedAspect: DecodedAspect?
+
+    private struct DecodedAspect: Equatable {
+        var videoID: String
+        var aspect: CGFloat
+    }
 
     static let cornerDefaultsKey = "miniPlayer.corner"
     static let scaleDefaultsKey = "miniPlayer.scale"
@@ -66,12 +74,26 @@ struct MiniPlayerView: View {
     private static let snapSpring = Spring(response: 0.35, dampingRatio: 0.8)
     private static let reducedMotionAnimation = Animation.easeOut(duration: 0.2)
     private static let relayoutAnimation = Animation.spring(response: 0.35, dampingFraction: 0.8)
+    private static let aspectPollAttempts = 120
+    private static let aspectPollInterval = Duration.milliseconds(250)
 
     /// Accessibility identifiers; UITests (PlayerAndMiniPlayerUITests) query these.
     private enum AXID {
         static let bar = "miniPlayer.bar"
         static let playPauseButton = "miniPlayer.playPauseButton"
         static let closeButton = "miniPlayer.closeButton"
+    }
+
+    /// Shape of the window: the decoded video's aspect ratio, else the full player's
+    /// orientation decision for this video, else the Shorts flag.
+    private var videoAspect: CGFloat {
+        let video = playerState.vm.currentVideo
+        if let decodedAspect, decodedAspect.videoID == video?.id { return decodedAspect.aspect }
+        let policy = PlayerOrientationController.shared.policy
+        if let video, policy.videoID == video.id {
+            return policy.videoIsLandscape ? MiniPlayerSnapping.aspectRatio : 1 / MiniPlayerSnapping.aspectRatio
+        }
+        return video?.isShort == true ? 1 / MiniPlayerSnapping.aspectRatio : MiniPlayerSnapping.aspectRatio
     }
 
     private var corner: MiniPlayerCorner {
@@ -84,7 +106,12 @@ struct MiniPlayerView: View {
         var screen: CGSize
         var obstructions: MiniPlayerInsets
         var scale: CGFloat
-        var size: CGSize { MiniPlayerSnapping.size(screen: screen, obstructions: obstructions, scale: scale) }
+        /// Video width / height; the window takes the same shape.
+        var aspect: CGFloat
+        var size: CGSize {
+            MiniPlayerSnapping.size(screen: screen, obstructions: obstructions, scale: scale, aspect: aspect)
+        }
+        var longSide: CGFloat { max(size.width, size.height) }
 
         func with(scale: CGFloat) -> Layout {
             var copy = self
@@ -126,7 +153,8 @@ struct MiniPlayerView: View {
                         bottom: keyboardShown ? keyboardAwareBottomInset : max(tabBarBottomInset, insets.bottom),
                         trailing: insets.trailing
                     ),
-                    scale: pinchScale ?? storedScale
+                    scale: pinchScale ?? storedScale,
+                    aspect: videoAspect
                 )
                 let anchor = layout.anchor(corner)
 
@@ -146,6 +174,24 @@ struct MiniPlayerView: View {
                     )
             }
             .ignoresSafeArea(.keyboard)
+        }
+        // The player item's size is not observable; poll until it is known, as the
+        // full-screen player does for its orientation (PlayerView+Lifecycle).
+        .task(id: playerState.vm.currentVideoId) {
+            guard let videoID = playerState.vm.currentVideoId, decodedAspect?.videoID != videoID else { return }
+            for _ in 0..<Self.aspectPollAttempts {
+                if Task.isCancelled { return }
+                if !playerState.vm.isLoading, playerState.vm.currentVideoId == videoID,
+                    let size = playerState.vm.player.currentItem?.presentationSize, size.width > 0, size.height > 0
+                {
+                    withAnimation(Self.relayoutAnimation) {
+                        decodedAspect = DecodedAspect(videoID: videoID, aspect: size.width / size.height)
+                    }
+                    miniPlayerLog.debug("video aspect \(Int(size.width))x\(Int(size.height)) id=\(videoID)")
+                    return
+                }
+                try? await Task.sleep(for: Self.aspectPollInterval)
+            }
         }
         .onChange(of: keyboardAwareBottomInset) { _, inset in
             miniPlayerLog.debug("keyboard-aware bottom inset=\(inset) tabBar=\(tabBarBottomInset)")
@@ -295,7 +341,7 @@ struct MiniPlayerView: View {
                     center = pinchCenter
                 } else {
                     // Start from the size on screen (the stored scale may be clamped).
-                    start = MiniPlayerSnapping.scale(forWidth: layout.size.width, screenWidth: layout.screen.width)
+                    start = MiniPlayerSnapping.scale(forLongSide: layout.longSide, screenWidth: layout.screen.width)
                     let anchor = layout.anchor(corner)
                     center = CGPoint(x: anchor.x + offsetX, y: anchor.y + offsetY)
                     pinchStartScale = start
@@ -316,7 +362,7 @@ struct MiniPlayerView: View {
                 lastDragActivity = .now
                 let resized = layout.with(scale: pinchScale ?? storedScale)
                 let committed = MiniPlayerSnapping.scale(
-                    forWidth: resized.size.width, screenWidth: resized.screen.width)
+                    forLongSide: resized.longSide, screenWidth: resized.screen.width)
                 let finalLayout = layout.with(scale: committed)
                 let center = CGPoint(x: resized.anchor(corner).x + offsetX, y: resized.anchor(corner).y + offsetY)
                 var transaction = Transaction()
