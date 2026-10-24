@@ -449,7 +449,10 @@ private struct MiniPlayerLayerView: UIViewRepresentable {
     func makeUIView(context: Context) -> UIView {
         let container = UIView()
         container.backgroundColor = .black
-        hostView.videoGravity = .resizeAspectFill
+        // Fit, never crop: the window already has the video's shape, so this only shows
+        // thin bars when the aspect is clamped or not decoded yet. The full-screen player
+        // sets its own gravity (Settings > Video Fit) when it takes the layer back.
+        hostView.videoGravity = .resizeAspect
         hostView.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(hostView)
         NSLayoutConstraint.activate([

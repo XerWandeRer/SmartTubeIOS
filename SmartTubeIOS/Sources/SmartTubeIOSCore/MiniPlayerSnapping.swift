@@ -51,7 +51,7 @@ public enum MiniPlayerSnapping {
     }
 
     /// Narrowest and widest window shapes (width / height). Videos outside this range
-    /// are cropped to it by the aspect-fill player layer.
+    /// are letterboxed inside it (the player layer fits, never crops).
     public static let aspectRange: ClosedRange<CGFloat> = (9.0 / 16)...(16.0 / 9)
 
     /// Largest width the user can pinch a window of `aspect` (width / height) to: the
