@@ -614,4 +614,35 @@ extension MiniPlayerUITests {
         XCTAssertEqual(after.minY, before.minY, accuracy: 1, "Home keeps its scroll position")
         XCTAssertEqual(after.minX, before.minX, accuracy: 1, "Home keeps its layout")
     }
+
+    /// Regression row 15 (first half): a Short opened while the mini player plays
+    /// covers it in portrait, and the mini player stays alive underneath. Closing the
+    /// Short is not covered: XCUITest's tap on shorts.backButton does not dismiss the
+    /// Short here, on the mytube baseline too.
+    func testShortOpensOverMiniPlayerInPortrait() throws {
+        try XCTSkipIf(Self.skipAllTests, Self.skipReason)
+        try showMiniPlayer()
+        moveMiniPlayer(to: .bottomTrailing)
+        let shortCard = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH 'shorts.card.'")).firstMatch
+        guard shortCard.waitForExistence(timeout: 10), shortCard.isHittable else {
+            try captureAndSkip("No Short on Home next to the mini player", in: app)
+        }
+        shortCard.tap()
+        // The class reuses one app launch; start the next test without the Short.
+        defer {
+            app.terminate()
+            app.launch()
+        }
+        let indexLabel = app.staticTexts["shorts.indexLabel"].firstMatch
+        guard indexLabel.waitForExistence(timeout: 20) else {
+            try captureAndSkip("The Shorts player did not open", in: app)
+        }
+        let window = app.windows.firstMatch
+        XCTAssertGreaterThan(window.frame.height, window.frame.width, "Shorts play in portrait")
+        XCTAssertTrue(miniPlayerBar.exists, "The mini player stays alive under the Short")
+        XCTAssertFalse(miniPlayerBar.isHittable, "The Shorts player covers the mini player")
+        XCTAssertFalse(playerTitle.exists, "Opening a Short does not expand the player")
+        attachScreenshot("short-over-mini")
+    }
 }
