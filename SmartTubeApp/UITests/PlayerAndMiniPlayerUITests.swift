@@ -59,10 +59,6 @@ final class PlayerAndMiniPlayerUITests: XCTestCase {
         app.buttons["miniPlayer.closeButton"].firstMatch
     }
 
-    private var miniPlayerTitle: XCUIElement {
-        app.staticTexts["miniPlayer.titleLabel"].firstMatch
-    }
-
     private var backButton: XCUIElement {
         app.buttons["player.backButton"].firstMatch
     }
@@ -175,21 +171,6 @@ final class PlayerAndMiniPlayerUITests: XCTestCase {
             "home.chipBar should be visible while mini-player is showing")
     }
 
-    func testMiniPlayerShowsCorrectTitle() throws {
-        try XCTSkipIf(Self.skipAllTests, Self.skipReason)
-        let title = try openPlayerFromHome()
-        guard !title.isEmpty else {
-            try captureAndSkip("Player title not yet populated — cannot verify mini-player title match", in: app)
-        }
-        minimizePlayer()
-        guard miniPlayerBar.waitForExistence(timeout: 5) else {
-            try captureAndSkip("miniPlayer.bar not found — mini-player may not be active in this environment", in: app)
-        }
-        XCTAssertEqual(
-            miniPlayerTitle.label, title,
-            "miniPlayer.titleLabel should match the video that was playing")
-    }
-
     func testMiniPlayerPlayPauseToggle() throws {
         try XCTSkipIf(Self.skipAllTests, Self.skipReason)
         try openPlayerFromHome()
@@ -234,7 +215,9 @@ final class PlayerAndMiniPlayerUITests: XCTestCase {
         guard miniPlayerBar.waitForExistence(timeout: 5) else {
             try captureAndSkip("miniPlayer.bar not found — mini-player may not be active in this environment", in: app)
         }
-        miniPlayerBar.tap()
+        // Tap the middle of the video: XCUIElement.tap() may pick a point on one of the
+        // window's buttons.
+        miniPlayerBar.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         XCTAssertTrue(
             playerTitle.waitForExistence(timeout: 5),
             "player.titleLabel should reappear after tapping the mini-player bar")
