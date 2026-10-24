@@ -240,7 +240,7 @@ struct MainTabView: View {
             // Reserve vertical space for whichever mini-player is visible so
             // scrollable content is not obscured (only one can be active at a time).
             if playerState.presentation == .miniPlayer || tosState.presentation == .miniPlayer {
-                Color.clear.frame(height: MiniPlayerView.height)
+                Color.clear.frame(height: 62)
             }
         }
         // Render the single visible MiniPlayerView above the tab bar.
