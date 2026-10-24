@@ -226,10 +226,13 @@ struct PlayerSwipeGestureOverlay: UIViewRepresentable {
 /// in PlayerSwipeGestureOverlay and the controls' SwiftUI drag.
 ///
 /// The axis is locked on the first movement (`PlayerPanGesture.axis`). Touches on a
-/// UIControl never start it, and it does not begin while `isEnabled` is false
-/// (scrubbing, menus). A cancelled or failed pan still ends, so a drag always settles.
+/// UIControl or on the progress bar never start it, and it does not begin while
+/// `isEnabled` is false (scrubbing, menus). A cancelled or failed pan still ends, so a drag always settles.
 struct PlayerPanGestureInstaller: UIViewRepresentable {
     var isEnabled: Bool
+    /// Touches in this window rect (the progress bar) never start the pan, so the
+    /// scrub drag gets them even before `isEnabled` catches up with `isScrubbing`.
+    var excludedFrame: CGRect?
     /// Axis and translation from touch-down.
     var onChanged: (PlayerPanAxis, CGPoint) -> Void
     /// Axis, translation and velocity (points per second). `cancelled` is true when the
@@ -316,6 +319,7 @@ struct PlayerPanGestureInstaller: UIViewRepresentable {
         }
 
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+            if let excluded = parent.excludedFrame, excluded.contains(touch.location(in: nil)) { return false }
             var view = touch.view
             while let current = view {
                 if current is UIControl { return false }

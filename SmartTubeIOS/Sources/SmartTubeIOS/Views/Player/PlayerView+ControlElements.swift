@@ -645,6 +645,9 @@ extension PlayerControlsOverlay {
         }
         .frame(height: 60)
         .accessibilityIdentifier("player.progressBar")
+        #if os(iOS)
+        .reportsScrubberFrame()
+        #endif
     }
 
     // Chapter tick marks on the progress bar — small white notches at each chapter boundary.

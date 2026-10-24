@@ -148,6 +148,7 @@ extension PlayerView {
                 // The one pan for previous / next and collapse, with or without controls.
                 PlayerPanGestureInstaller(
                     isEnabled: isPanEnabled,
+                    excludedFrame: scrubberFrame,
                     onChanged: { axis, translation in panChanged(axis, translation: translation) },
                     onEnded: { axis, translation, velocity, cancelled in
                         panEnded(
@@ -538,6 +539,7 @@ extension PlayerView {
             playerContentView
                 .navigationBarHidden(true)
                 .toolbar(.hidden, for: .tabBar)
+                .onPreferenceChange(PlayerScrubberFrameKey.self) { scrubberFrame = $0 }
             #else
             playerContentView
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

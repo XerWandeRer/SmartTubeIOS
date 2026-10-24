@@ -62,6 +62,8 @@ public struct PlayerView: View {
     @Environment(\.verticalSizeClass) var verticalSizeClass
     /// Set by ResidentPlayerLayer, which hosts the full-screen player.
     @Environment(\.residentPlayer) var residentPlayer
+    /// Window frame of the progress bar while it is shown; the pan ignores touches there.
+    @State var scrubberFrame: CGRect?
     #endif
     /// True while the app is backgrounded. Prevents `onDisappear` from calling
     /// `suspend()` when iOS fires it as a side-effect of backgrounding rather
