@@ -231,31 +231,23 @@ struct MainTabView: View {
             selectedTab = .home
         }
         // Reserve vertical space so scrollable tab content is not hidden under the
-        // mini player. Uses a transparent placeholder rather than the real MiniPlayerView
-        // to avoid duplicating the PersistentPlayerHostView UIKit layer across tabs.
+        // TOS mini player bar. Uses a transparent placeholder rather than the real view.
+        // The AVPlayer mini player floats over the content instead and reserves nothing.
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            // Reserve vertical space for whichever mini-player is visible so
-            // scrollable content is not obscured (only one can be active at a time).
-            if playerState.presentation == .miniPlayer || tosState.presentation == .miniPlayer {
+            if tosState.presentation == .miniPlayer {
                 Color.clear.frame(height: 62)
             }
         }
-        // Render the single visible MiniPlayerView above the tab bar.
         // tabBarBottomInset = tab-bar height + home-indicator (e.g. 83 pt on Face ID
         // iPhones), read from inside the NavigationStack where UITabBarController has
-        // already baked it into the safe area. The transparent passthrough spacer below
-        // the mini player ensures tab-bar items remain tappable.
+        // already baked it into the safe area.
         .overlay(alignment: .bottom) {
             // Only one mini-player can be active at a time: AVPlayer and TOS are
             // mutually exclusive (onChange stops the other before starting the new one).
             if playerState.presentation == .miniPlayer {
-                VStack(spacing: 0) {
-                    MiniPlayerView()
-                    Color.clear
-                    .frame(height: tabBarBottomInset)
-                    .allowsHitTesting(false)
-                }
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                // Floating window; fills the overlay but only the window takes touches.
+                MiniPlayerView(tabBarBottomInset: tabBarBottomInset)
+                .transition(.opacity)
                 .animation(.easeInOut(duration: 0.2), value: playerState.presentation)
             } else if tosState.presentation == .miniPlayer {
                 VStack(spacing: 0) {
