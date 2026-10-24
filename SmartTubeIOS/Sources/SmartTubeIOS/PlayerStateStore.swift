@@ -109,14 +109,6 @@ public final class PlayerStateStore {
             ? ResidentPlayerGeometry.defaultShortAspectRatio : ResidentPlayerGeometry.defaultAspectRatio
     }
 
-    // MARK: - Imperative dismiss hook
-
-    /// Set by LandscapePresenter's coordinator when a full-screen player is presented.
-    /// Fired imperatively by minimize() / stop() to bypass the SwiftUI update-propagation
-    /// pause that occurs when the presenting VC's view is removed from the window by
-    /// UIKit's .fullScreen presentation style (so updateUIViewController never fires).
-    var dismissPlayerAction: (() -> Void)?
-
     // MARK: - Owned objects
 
     /// The single PlaybackViewModel for the app. Lives for the app's lifetime.
@@ -272,16 +264,12 @@ public final class PlayerStateStore {
         storeLog.notice("[PlayerStateStore] play — presentation set to .fullScreen")
     }
 
-    /// Collapse the full-screen player to the mini-player bar. Playback continues.
+    /// Collapse the full-screen player to the mini player. Playback continues.
     public func minimize() {
         storeLog.notice("[PlayerStateStore] minimize — currentPresentation=\(String(describing: self.presentation))")
         presentation = .miniPlayer
         syncOrientation()
-        let action = dismissPlayerAction
-        dismissPlayerAction = nil
-        storeLog.notice(
-            "[PlayerStateStore] minimize — presentation set to .miniPlayer, dismissPlayerAction=\(action != nil)")
-        action?()
+        storeLog.notice("[PlayerStateStore] minimize — presentation set to .miniPlayer")
     }
 
     /// Expand the mini-player back to full-screen.
@@ -299,10 +287,7 @@ public final class PlayerStateStore {
         currentVideo = nil
         presentation = .hidden
         syncOrientation()
-        let action = dismissPlayerAction
-        dismissPlayerAction = nil
-        storeLog.notice("[PlayerStateStore] stop — presentation set to .hidden, dismissPlayerAction=\(action != nil)")
-        action?()
+        storeLog.notice("[PlayerStateStore] stop — presentation set to .hidden")
     }
 }
 #endif

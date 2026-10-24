@@ -31,9 +31,9 @@ public final class PlayerOrientationController {
 
     private init() {
         // Unlocking or returning from the home screen: UIKit may have rotated the
-        // window meanwhile (the lock screen is portrait-only). The player lives in a
-        // UIKit-presented hosting controller, where SwiftUI's scenePhase never changes,
-        // so listen to UIKit directly.
+        // window meanwhile (the lock screen is portrait-only). Listen to UIKit directly:
+        // this controller is not a view, and the TOS player still lives in a
+        // UIKit-presented hosting controller where SwiftUI's scenePhase never changes.
         didBecomeActiveObserver = NotificationCenter.default.addObserver(
             forName: UIApplication.didBecomeActiveNotification,
             object: nil,
