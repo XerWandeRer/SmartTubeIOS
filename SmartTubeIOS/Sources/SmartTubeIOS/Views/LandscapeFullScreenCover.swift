@@ -8,9 +8,8 @@ private let landscapeLog = Logger(subsystem: "com.void.smarttube.app", category:
 
 // MARK: - FullScreenPlayerDismissible
 
-/// Conformed to by both PlayerStateStore (AVPlayer) and TOSPlayerStateStore (TOS),
-/// letting LandscapePresenter wire up the same imperative-dismiss-hook pattern for
-/// either pipeline without referencing the other's concrete type.
+/// Conformed to by TOSPlayerStateStore, the only player still presented with this
+/// cover (the AVPlayer player lives in ResidentPlayerLayer).
 ///
 /// `dismissPlayerAction` is set by LandscapePresenter's coordinator when this store's
 /// full-screen player is presented, and fired by minimize()/stop() to bypass the
@@ -22,7 +21,6 @@ protocol FullScreenPlayerDismissible: AnyObject {
     var dismissPlayerAction: (() -> Void)? { get set }
 }
 
-extension PlayerStateStore: FullScreenPlayerDismissible {}
 extension TOSPlayerStateStore: FullScreenPlayerDismissible {}
 
 // MARK: - LandscapeAwareHostingController
@@ -52,7 +50,7 @@ final class LandscapeAwareHostingController: UIHostingController<AnyView> {
 
 extension View {
     /// Drop-in replacement for `.fullScreenCover(item:content:)` when presenting
-    /// PlayerView on iOS. Hosts the content in a `LandscapeAwareHostingController`
+    /// the TOS player on iOS. Hosts the content in a `LandscapeAwareHostingController`
     /// so UIKit can rotate the window to landscape while the player is active.
     func landscapePlayerCover<Item: Identifiable & Hashable, Content: View>(
         item: Binding<Item?>,
@@ -71,10 +69,9 @@ extension View {
 
 private struct LandscapePresenter<Item: Identifiable & Hashable>: UIViewControllerRepresentable {
     @Binding var item: Item?
-    /// The presentation store for THIS cover (PlayerStateStore for the AVPlayer cover,
-    /// TOSPlayerStateStore for the TOS cover). Wired up imperatively below so
-    /// minimize()/stop() can dismiss the hosted VC directly — see
-    /// FullScreenPlayerDismissible's doc comment.
+    /// The presentation store for THIS cover (TOSPlayerStateStore). Wired up
+    /// imperatively below so minimize()/stop() can dismiss the hosted VC directly —
+    /// see FullScreenPlayerDismissible's doc comment.
     let dismissStore: any FullScreenPlayerDismissible
     let content: (Item) -> AnyView
 
