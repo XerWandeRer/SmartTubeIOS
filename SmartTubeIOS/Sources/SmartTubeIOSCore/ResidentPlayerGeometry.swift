@@ -8,7 +8,7 @@ import Foundation
 public struct ResidentPlayerMorph: Equatable, Sendable {
     /// Visible rect, in full-screen coordinates.
     public var clip: CGRect
-    /// Scale of the video surface; always just enough to cover `clip`.
+    /// Scale of the video surface.
     public var scale: CGFloat
     public var cornerRadius: CGFloat
 }
@@ -46,8 +46,10 @@ public enum ResidentPlayerGeometry {
     }
 
     /// The morph at `progress` (1 = full screen, 0 = mini player). The clip moves
-    /// linearly from `fullScreenClip` to `mini`; the scale always covers the clip, so
-    /// no frame shows bars around the video.
+    /// linearly from `fullScreenClip` to `mini`, and the scale from the one that covers
+    /// the full-screen clip to the one that fits the video into the mini player (never
+    /// crop it there). While the mini player has the video's shape no frame shows bars;
+    /// a video outside the mini player's aspect range ends letterboxed in it.
     public static func morph(
         progress: CGFloat,
         videoFrame: CGRect,
@@ -55,10 +57,11 @@ public enum ResidentPlayerGeometry {
         mini: CGRect
     ) -> ResidentPlayerMorph {
         let collapsed = 1 - clamp(progress)
-        let clip = lerp(fullScreenClip, mini, collapsed)
+        let fullScale = coverScale(of: videoFrame.size, over: fullScreenClip.size)
+        let miniScale = fitScale(of: videoFrame.size, into: mini.size)
         return ResidentPlayerMorph(
-            clip: clip,
-            scale: coverScale(of: videoFrame.size, over: clip.size),
+            clip: lerp(fullScreenClip, mini, collapsed),
+            scale: fullScale + (miniScale - fullScale) * collapsed,
             cornerRadius: MiniPlayerSnapping.cornerRadius * collapsed
         )
     }
@@ -67,6 +70,12 @@ public enum ResidentPlayerGeometry {
     static func coverScale(of size: CGSize, over target: CGSize) -> CGFloat {
         guard size.width > 0, size.height > 0 else { return 1 }
         return max(target.width / size.width, target.height / size.height)
+    }
+
+    /// Largest scale at which `size` fits inside `target`.
+    static func fitScale(of size: CGSize, into target: CGSize) -> CGFloat {
+        guard size.width > 0, size.height > 0 else { return 1 }
+        return min(target.width / size.width, target.height / size.height)
     }
 
     /// `value` limited to 0...1.

@@ -61,7 +61,8 @@ struct ResidentPlayerGeometryTests {
         let morph = ResidentPlayerGeometry.morph(
             progress: 0, videoFrame: landscapeVideo, fullScreenClip: landscapeVideo, mini: mini)
         #expect(near(morph.clip, mini))
-        #expect(near(morph.scale, 0.45))
+        // Fitted: the 106 pt height limits it (189 / 420 would crop 0.3 pt).
+        #expect(near(morph.scale, 106 / 236.25))
         #expect(near(morph.cornerRadius, MiniPlayerSnapping.cornerRadius))
     }
 
@@ -73,17 +74,29 @@ struct ResidentPlayerGeometryTests {
         #expect(near(morph.scale, 912 / 236.25))
     }
 
-    @Test("No intermediate frame shows bars: the scaled video always covers the clip")
+    @Test("No intermediate frame shows bars while the mini player has the video's shape")
     func morphNeverShowsBars() {
         let portraitVideo = ResidentPlayerGeometry.videoFrame(aspectRatio: 9 / 16, screen: screen)
-        for video in [landscapeVideo, portraitVideo] {
+        // Upright mini player for the portrait video, as MiniPlayerSnapping sizes it.
+        let portraitMini = CGRect(x: 302, y: 535, width: 106, height: 189)
+        for (video, window) in [(landscapeVideo, mini), (portraitVideo, portraitMini)] {
+            // Within a point: the mini player's size is rounded to whole points.
             for step in 0...20 {
                 let morph = ResidentPlayerGeometry.morph(
-                    progress: CGFloat(step) / 20, videoFrame: video, fullScreenClip: video, mini: mini)
-                #expect(video.width * morph.scale >= morph.clip.width - 0.001)
-                #expect(video.height * morph.scale >= morph.clip.height - 0.001)
+                    progress: CGFloat(step) / 20, videoFrame: video, fullScreenClip: video, mini: window)
+                #expect(video.width * morph.scale >= morph.clip.width - 1)
+                #expect(video.height * morph.scale >= morph.clip.height - 1)
             }
         }
+    }
+
+    @Test("A video wider than the mini player's range is fitted, not cropped")
+    func morphFitsAtMini() {
+        // 2.39:1 video in the widest (16:9) mini player.
+        let wide = ResidentPlayerGeometry.videoFrame(aspectRatio: 2.39, screen: screen)
+        let morph = ResidentPlayerGeometry.morph(progress: 0, videoFrame: wide, fullScreenClip: wide, mini: mini)
+        #expect(near(morph.scale, 189 / 420))
+        #expect(wide.height * morph.scale < mini.height)
     }
 
     @Test("Progress outside 0...1 is clamped")
