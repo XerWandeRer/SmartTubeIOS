@@ -158,4 +158,153 @@ final class QuickAccessRowUITests: XCTestCase {
         let pickerAppeared = app.buttons["Cancel"].firstMatch.waitForExistence(timeout: 5)
         XCTAssertTrue(pickerAppeared, "Tapping the enabled quality button should open the quality picker")
     }
+
+    // MARK: - XER-15 regression: chosen speed survives pause, quality switch and next video
+
+    /// Before the fix, resume, quality switches and the next video re-applied the
+    /// speed that was current when the player view appeared, so 1.5× fell back to 1×.
+    /// The quick-access label reads the stored setting, so the test measures the
+    /// real rate from how fast `player.currentTimeLabel` advances.
+    func testChosenSpeedSurvivesPauseQualitySwitchAndNextVideo() throws {
+        app.terminate()
+        app.launchArguments.append("--uitesting-reset-settings")
+        app.launch()
+        try openPlayerFromHome()
+        showControls()
+
+        let speedBtn = app.buttons["player.quickAccess.speed"]
+        guard speedBtn.waitForExistence(timeout: 10) else {
+            try captureAndSkip("player.quickAccess.speed not found", in: app)
+        }
+        try assertRate(near: 1.0, "1× baseline before choosing a speed")
+
+        speedBtn.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        let picker = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier == 'player.speedPicker'")).firstMatch
+        XCTAssertTrue(picker.waitForExistence(timeout: 5), "speed picker should open")
+        // The picker's identifier propagates to its header too; the rows live in its scroll view.
+        let rows = app.scrollViews["player.speedPicker"].firstMatch
+        let option = rows.buttons.matching(NSPredicate(format: "label BEGINSWITH '1.5'")).firstMatch
+        XCTAssertTrue(option.waitForExistence(timeout: 5), "1.5× option should be listed")
+        if !option.isHittable { rows.swipeUp() }
+        option.tap()
+        try assertRate(near: 1.5, "right after choosing 1.5×")
+
+        revealControls()
+        let playPause = app.buttons["player.playPauseButton"].firstMatch
+        XCTAssertTrue(playPause.waitForExistence(timeout: 5))
+        playPause.tap()
+        playPause.tap()
+        try assertRate(near: 1.5, "after pause and resume")
+
+        try switchQualityIfPossible()
+
+        revealControls()
+        let title = app.staticTexts["player.titleLabel"].firstMatch
+        let oldTitle = title.label
+        let nextBtn = app.buttons["player.nextBtn"].firstMatch
+        guard nextBtn.waitForExistence(timeout: 10), nextBtn.isEnabled else {
+            try captureAndSkip("player.nextBtn missing or disabled — no next video", in: app)
+        }
+        nextBtn.tap()
+        let titleChanged = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label != %@", oldTitle), object: title)
+        XCTAssertEqual(XCTWaiter().wait(for: [titleChanged], timeout: 20), .completed, "next video should load")
+        try assertRate(near: 1.5, "on the next video")
+    }
+
+    /// Picks a quality other than the current one, which re-creates the player item
+    /// through PlaybackQualityManager. Records an activity and returns when the
+    /// stream offers nothing to switch to.
+    private func switchQualityIfPossible() throws {
+        revealControls()
+        let qualityBtn = app.buttons["player.quickAccess.quality"]
+        let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isEnabled == true"), object: qualityBtn)
+        guard qualityBtn.waitForExistence(timeout: 10), XCTWaiter().wait(for: [enabled], timeout: 20) == .completed
+        else {
+            XCTContext.runActivity(named: "Quality button not enabled — quality switch step skipped") { _ in }
+            return
+        }
+        revealControls()
+        qualityBtn.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        let picker = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier == 'player.qualityPicker'")).firstMatch
+        XCTAssertTrue(picker.waitForExistence(timeout: 5), "quality picker should open")
+        let rows = app.scrollViews["player.qualityPicker"].firstMatch
+        let formats = rows.buttons.matching(NSPredicate(format: "label MATCHES '^[0-9]+p.*'"))
+        guard formats.firstMatch.exists else {
+            app.buttons["Cancel"].firstMatch.tap()
+            XCTContext.runActivity(named: "No explicit formats listed — quality switch step skipped") { _ in }
+            return
+        }
+        // Auto is selected after a settings reset, so any explicit format is a switch.
+        let target = formats.firstMatch
+        XCTContext.runActivity(named: "Switching quality to \(target.label)") { _ in }
+        target.tap()
+        try assertRate(near: 1.5, "after switching quality to \(target.label)")
+    }
+
+    /// Measures the playback rate as video seconds per wall-clock second while the
+    /// current-time label advances `span` seconds. A stall makes the rate read low,
+    /// never high, so a pass at 1.5× cannot come from buffering noise.
+    private func assertRate(
+        near expected: Double, _ context: String, span: Int = 15, file: StaticString = #filePath, line: UInt = #line
+    ) throws {
+        // Wait until playback is actually advancing, so loading time is not counted.
+        guard let start = waitForTimeLabelToTick(timeout: 30) else {
+            try captureAndSkip("current time never advanced (\(context)) — playback did not start", in: app)
+        }
+        let wallStart = Date()
+        let deadline = wallStart.addingTimeInterval(Double(span) * 2.5)
+        var now = start
+        var samples: [String] = []
+        while now < start + span && Date() < deadline {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+            let reading = currentTimeSeconds()
+            if reading != now {
+                let elapsed = Date().timeIntervalSince(wallStart)
+                samples.append(String(format: "%.1f:%@", elapsed, reading.map(String.init) ?? "nil"))
+            }
+            now = reading ?? now
+        }
+        let wall = Date().timeIntervalSince(wallStart)
+        let rate = Double(now - start) / wall
+        let message = String(format: "%@: measured %.2f× (%d s of video in %.1f s)", context, rate, now - start, wall)
+        XCTContext.runActivity(named: message + " samples " + samples.joined(separator: " ")) { _ in }
+        // 1× and 1.5× are 0.5 apart; ±0.2 covers the 1 s label granularity and query latency.
+        XCTAssertEqual(rate, expected, accuracy: 0.2, message, file: file, line: line)
+    }
+
+    /// Returns the label value right after it changes, or nil on timeout.
+    private func waitForTimeLabelToTick(timeout: TimeInterval) -> Int? {
+        let deadline = Date().addingTimeInterval(timeout)
+        var last = currentTimeSeconds()
+        while Date() < deadline {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+            let reading = currentTimeSeconds()
+            if let reading, let last, reading > last { return reading }
+            last = reading ?? last
+        }
+        return nil
+    }
+
+    /// On iOS the controls auto-hide again after play/pause even with
+    /// --uitesting-show-controls. One tap on the video surface brings them back
+    /// (a single tap only toggles controls; seeking needs a double tap).
+    private func revealControls() {
+        let playPause = app.buttons["player.playPauseButton"].firstMatch
+        guard !playPause.exists else { return }
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35)).tap()
+        _ = playPause.waitForExistence(timeout: 2)
+    }
+
+    /// Parses `player.currentTimeLabel` ("m:ss" or "h:mm:ss") into seconds.
+    private func currentTimeSeconds() -> Int? {
+        let label = app.staticTexts["player.currentTimeLabel"].firstMatch
+        if !label.exists { revealControls() }
+        guard let text = (try? label.snapshot())?.label else { return nil }
+        let parts = text.split(separator: ":").compactMap { Int($0) }
+        guard !parts.isEmpty else { return nil }
+        return parts.reduce(0) { $0 * 60 + $1 }
+    }
 }
