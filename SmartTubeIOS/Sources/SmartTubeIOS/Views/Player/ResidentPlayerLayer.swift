@@ -38,6 +38,10 @@ struct ResidentPlayerLayer: View {
 
     /// 1 = full screen, 0 = mini player. Animated when the presentation changes.
     @State private var progress: CGFloat = 1
+    /// Progress while the expanded player is dragged down; overrides `progress`.
+    @State private var collapseDragProgress: CGFloat?
+    /// Full screen height, for the collapse drag's travel.
+    @State private var screenHeight: CGFloat = 0
     /// Centre (screen coordinates) when the current drag began; nil when not dragging.
     @State private var dragStartCenter: CGPoint?
     /// Displacement from the current corner's anchor. Separate axes so the snap can
@@ -78,6 +82,14 @@ struct ResidentPlayerLayer: View {
 
     private var isMini: Bool { playerState.presentation == .miniPlayer }
 
+    /// What the layer draws: the finger's progress while dragging, else `progress`.
+    private var displayedProgress: CGFloat { collapseDragProgress ?? progress }
+
+    /// PlayerView's controls fade out over the first 30 % of a collapse.
+    private var controlsOpacity: Double {
+        Double(ResidentPlayerGeometry.clamp((displayedProgress - 0.7) / 0.3))
+    }
+
     /// Everything the mini player's anchors depend on except the corner. A change (tab
     /// bar height, keyboard, rotation) re-anchors the window in the same corner, animated.
     private struct Layout: Equatable {
@@ -94,16 +106,29 @@ struct ResidentPlayerLayer: View {
         ZStack {
             if playerState.presentation != .hidden, let video = playerState.currentVideo {
                 Color.black
-                    .opacity(Double(progress))
+                    .opacity(Double(displayedProgress))
                     .ignoresSafeArea()
                     // Covers the tabs while expanded; the mini player leaves them usable.
                     .allowsHitTesting(!isMini)
+                    .onGeometryChange(for: CGFloat.self) { proxy in
+                        proxy.size.height + proxy.safeAreaInsets.top + proxy.safeAreaInsets.bottom
+                    } action: {
+                        screenHeight = $0
+                    }
 
                 videoLayer
 
                 if playerState.presentation == .fullScreen {
                     PlayerView(video: video, api: api)
                         .id(video.id)
+                        .environment(
+                            \.residentPlayer,
+                            ResidentPlayerContext(
+                                collapseDragChanged: { collapseDragChanged($0) },
+                                collapseDragEnded: { collapseDragEnded($0, velocity: $1) }
+                            )
+                        )
+                        .opacity(controlsOpacity)
                         .transition(.opacity.animation(Self.controlsFade))
                 }
             }
@@ -123,6 +148,7 @@ struct ResidentPlayerLayer: View {
         case .hidden:
             // Closed: the next video opens straight at full screen.
             progress = 1
+            collapseDragProgress = nil
             dragStartCenter = nil
             offsetX = 0
             offsetY = 0
@@ -132,6 +158,51 @@ struct ResidentPlayerLayer: View {
 
     private var transitionAnimation: Animation {
         reduceMotion ? Self.reducedMotionAnimation : .spring(Self.presentationSpring)
+    }
+
+    // MARK: - Collapse drag
+
+    private var collapseTravel: CGFloat { PlayerPanGesture.collapseTravel(screenHeight: screenHeight) }
+
+    /// The expanded player follows a downward drag (translation from touch-down).
+    private func collapseDragChanged(_ translation: CGFloat) {
+        guard playerState.presentation == .fullScreen else { return }
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            collapseDragProgress = PlayerPanGesture.progress(translation: translation, travel: collapseTravel)
+        }
+    }
+
+    /// Release (or cancel, with zero velocity): the projected end point decides between
+    /// mini player and full screen, and a spring starting at the finger's velocity
+    /// finishes the way there.
+    private func collapseDragEnded(_ translation: CGFloat, velocity: CGFloat) {
+        guard let current = collapseDragProgress else { return }
+        let travel = collapseTravel
+        let collapse = PlayerPanGesture.shouldCollapse(translation: translation, velocity: velocity, travel: travel)
+        let target: CGFloat = collapse ? 0 : 1
+        residentLog.notice(
+            "collapse drag end dy=\(translation) vy=\(velocity) progress=\(current) collapse=\(collapse)")
+        // Hand the finger's value over without moving, then animate from there.
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            progress = current
+            collapseDragProgress = nil
+        }
+        let animation: Animation =
+            reduceMotion
+            ? Self.reducedMotionAnimation
+            : .interpolatingSpring(
+                Self.presentationSpring,
+                initialVelocity: Double(
+                    PlayerPanGesture.springVelocity(velocity: velocity, travel: travel, from: current, to: target))
+            )
+        withAnimation(animation) { progress = target }
+        guard collapse else { return }
+        // presentationChanged then finds progress already at 0 and leaves the spring alone.
+        if store.settings.miniPlayerEnabled { playerState.minimize() } else { playerState.stop() }
     }
 
     // MARK: - Video layer
@@ -172,7 +243,7 @@ struct ResidentPlayerLayer: View {
                     .accessibilityHidden(true)
                     .modifier(
                         ResidentMorph(
-                            progress: progress,
+                            progress: displayedProgress,
                             lift: isLifted ? 1 : 0,
                             fill: fill ? 1 : 0,
                             miniCenter: layout.anchor(corner),
@@ -187,6 +258,8 @@ struct ResidentPlayerLayer: View {
                     )
                     .animation(Self.relayoutAnimation, value: layout)
                     .animation(Self.gravityAnimation, value: fill)
+                    // PlayerView's previous / next slide moves the video too.
+                    .offset(x: playerState.slideOffset)
                     .offset(x: offsetX)
                     .offset(y: offsetY)
                     .highPriorityGesture(dragGesture(layout: layout), including: isMini ? .all : .none)
@@ -369,6 +442,20 @@ struct ResidentPlayerLayer: View {
         let relativeVelocity = abs(distance) > 1 ? Double(velocity / distance) : 0
         return .interpolatingSpring(Self.snapSpring, initialVelocity: relativeVelocity)
     }
+}
+
+// MARK: - ResidentPlayerContext
+
+/// What ResidentPlayerLayer hands to the PlayerView it hosts: the downward drag of the
+/// expanded player, in points from touch-down (and the release velocity).
+struct ResidentPlayerContext: Sendable {
+    var collapseDragChanged: @MainActor @Sendable (CGFloat) -> Void
+    var collapseDragEnded: @MainActor @Sendable (_ translation: CGFloat, _ velocity: CGFloat) -> Void
+}
+
+extension EnvironmentValues {
+    /// Non-nil while PlayerView is hosted by ResidentPlayerLayer.
+    @Entry var residentPlayer: ResidentPlayerContext?
 }
 
 // MARK: - ResidentMorph

@@ -69,7 +69,8 @@ public enum ResidentPlayerGeometry {
         return max(target.width / size.width, target.height / size.height)
     }
 
-    static func clamp(_ value: CGFloat) -> CGFloat { min(1, max(0, value)) }
+    /// `value` limited to 0...1.
+    public static func clamp(_ value: CGFloat) -> CGFloat { min(1, max(0, value)) }
 
     static func lerp(_ from: CGRect, _ to: CGRect, _ fraction: CGFloat) -> CGRect {
         CGRect(

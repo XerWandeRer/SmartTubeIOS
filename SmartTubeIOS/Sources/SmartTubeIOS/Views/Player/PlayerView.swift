@@ -38,7 +38,16 @@ public struct PlayerView: View {
     @State var moreMenuContentHeight: CGFloat = 0
     @State var showDescriptionSheet = false
     @State var showCommentsSheet = false
+    #if os(iOS)
+    /// Horizontal offset of the previous / next video slide. Kept in PlayerStateStore so
+    /// the video, which ResidentPlayerLayer draws, slides with the controls.
+    var slideOffset: CGFloat {
+        get { playerState.slideOffset }
+        nonmutating set { playerState.slideOffset = newValue }
+    }
+    #else
     @State var slideOffset: CGFloat = 0
+    #endif
     @State var isTransitioning = false
     @State var channelDestination: ChannelDestination?
     #if !os(tvOS)
@@ -51,6 +60,8 @@ public struct PlayerView: View {
     var playerLayer: AVPlayerLayer { playerState.playerHostView.playerLayer }
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
     @Environment(\.verticalSizeClass) var verticalSizeClass
+    /// Set by ResidentPlayerLayer, which hosts the full-screen player.
+    @Environment(\.residentPlayer) var residentPlayer
     #endif
     /// True while the app is backgrounded. Prevents `onDisappear` from calling
     /// `suspend()` when iOS fires it as a side-effect of backgrounding rather
