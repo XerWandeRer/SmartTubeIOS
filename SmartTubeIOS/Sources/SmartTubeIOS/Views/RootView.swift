@@ -152,6 +152,36 @@ struct MainTabView: View {
     @Environment(PlayerRouter.self) private var playerRouter
     @Environment(BrowseViewModel.self) private var browseVM
     @State private var showSrcSwapSpike = false
+    /// The window area and safe area the tabs were last laid out in while no player
+    /// covered them.
+    @State private var tabsGeometry = TabsGeometry()
+    /// Keeps the tabs at `tabsGeometry` while the expanded player covers them, so a
+    /// landscape player does not re-layout them (and lose their scroll positions).
+    @State private var pinsTabs = false
+    @State private var currentGeometry = TabsGeometry()
+    @Environment(\.isLandscapeLayout) private var isLandscapeLayout
+    #endif
+
+    #if os(iOS)
+    /// Pins the tabs while the player is expanded. After it collapses they stay pinned
+    /// until the window is back in the orientation they were laid out for, unless the
+    /// window is not rotating back (the device itself is in landscape).
+    private func updateTabsPin(_ geometry: TabsGeometry?) {
+        if let geometry { currentGeometry = geometry }
+        let size = currentGeometry.size
+        let expanded = playerState.presentation == .fullScreen
+        let backInPinnedOrientation =
+            (size.width > size.height) == (tabsGeometry.size.width > tabsGeometry.size.height)
+        let pin =
+            expanded
+            || (pinsTabs && !backInPinnedOrientation && PlayerOrientationController.shared.dismissRotatesToPortrait)
+        if !pin, size != .zero { tabsGeometry = currentGeometry }
+        if pin != pinsTabs {
+            rootLog.notice(
+                "[MainTabView] tabs pinned=\(pin) at \(tabsGeometry.size.width)x\(tabsGeometry.size.height)")
+            pinsTabs = pin
+        }
+    }
     #endif
 
     var body: some View {
@@ -206,6 +236,35 @@ struct MainTabView: View {
         .onPreferenceChange(TabBarBottomInsetKey.self) { tabBarBottomInset = $0 }
         #if os(iOS)
         .background(TabBarLiquidGlassConfigurator(disableLiquidGlass: store.settings.disableLiquidGlass))
+        // Pinned: the window size, safe area and layout orientation from before, whatever
+        // the window does meanwhile (the video grid changes its columns and resets its
+        // identity on isLandscapeLayout). Unpinned these are no-ops.
+        .environment(
+            \.isLandscapeLayout,
+            pinsTabs ? tabsGeometry.size.width > tabsGeometry.size.height : isLandscapeLayout
+        )
+        .safeAreaPadding(pinsTabs ? tabsGeometry.insets : EdgeInsets())
+        .ignoresSafeArea(edges: pinsTabs ? .all : [])
+        .frame(
+            width: pinsTabs ? tabsGeometry.size.width : nil,
+            height: pinsTabs ? tabsGeometry.size.height : nil
+        )
+        // Exactly the proposed size, even while the pinned tabs are taller (landscape),
+        // so everything layered on top (the player) still fills the window.
+        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+        .onGeometryChange(for: TabsGeometry.self) { proxy in
+            let insets = proxy.safeAreaInsets
+            return TabsGeometry(
+                size: CGSize(
+                    width: proxy.size.width + insets.leading + insets.trailing,
+                    height: proxy.size.height + insets.top + insets.bottom),
+                insets: insets)
+        } action: { geometry in
+            updateTabsPin(geometry)
+        }
+        .onChange(of: playerState.presentation) { _, _ in
+            updateTabsPin(nil)
+        }
         #endif
         .environment(searchVM)
         .onReceive(NotificationCenter.default.publisher(for: .navigateToSearch)) { _ in
@@ -442,3 +501,11 @@ struct MainSidebarView: View {
         }
     }
 }
+
+#if os(iOS)
+/// Window size (safe area included) and safe-area insets the tabs are laid out in.
+private struct TabsGeometry: Equatable {
+    var size: CGSize = .zero
+    var insets = EdgeInsets()
+}
+#endif

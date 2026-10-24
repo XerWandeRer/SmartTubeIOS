@@ -566,4 +566,52 @@ extension MiniPlayerUITests {
             withVelocity: XCUIGestureVelocity(600), thenHoldForDuration: 0.2)
         assertStaysExpanded("Dragging the progress bar only seeks, even with a vertical component")
     }
+
+    // MARK: Landscape (XER-14 step 4)
+
+    /// Regression row 6: a landscape video minimized from full screen rotates back to
+    /// portrait before it shrinks, and Home keeps its scroll position.
+    func testLandscapeRoundTripKeepsHomeScrollPosition() throws {
+        try XCTSkipIf(Self.skipAllTests, Self.skipReason)
+        UITestHelpers.tapTab(named: "Home", in: app)
+        _ = UITestHelpers.waitForVideoCards(in: app, timeout: 20)
+        app.swipeUp()
+        app.swipeUp()
+        let window = app.windows.firstMatch
+        let screen = window.frame
+        let cards = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'video.card.'"))
+        let reference = cards.allElementsBoundByIndex.first {
+            let frame = $0.frame
+            return frame.minY > screen.minY + 150 && frame.maxY < screen.maxY - 200 && $0.isHittable
+        }
+        guard let reference else {
+            try captureAndSkip("No video card fully visible after scrolling Home", in: app)
+        }
+        let id = reference.identifier
+        let before = reference.frame
+        attachScreenshot("home-before")
+
+        reference.tap()
+        guard playerTitle.waitForExistence(timeout: 15) else {
+            try captureAndSkip("Player did not open", in: app)
+        }
+        let landscape = XCTNSPredicateExpectation(
+            predicate: NSPredicate { _, _ in window.frame.width > window.frame.height }, object: nil)
+        guard XCTWaiter().wait(for: [landscape], timeout: 8) == .completed else {
+            try captureAndSkip("The opened video is not landscape", in: app)
+        }
+        minimizePlayer()
+        XCTAssertTrue(miniPlayerBar.waitForExistence(timeout: 8), "The back button minimizes the player")
+        let portrait = XCTNSPredicateExpectation(
+            predicate: NSPredicate { _, _ in window.frame.height > window.frame.width }, object: nil)
+        XCTAssertEqual(XCTWaiter().wait(for: [portrait], timeout: 5), .completed, "Minimizing rotates back to portrait")
+        waitForMiniPlayerToSettle()
+        attachScreenshot("home-after")
+
+        // Re-laying the tabs out in landscape used to move this card by up to 268 pt
+        // (the old UIKit cover: 46 pt).
+        let after = app.descendants(matching: .any)[id].firstMatch.frame
+        XCTAssertEqual(after.minY, before.minY, accuracy: 1, "Home keeps its scroll position")
+        XCTAssertEqual(after.minX, before.minX, accuracy: 1, "Home keeps its layout")
+    }
 }
