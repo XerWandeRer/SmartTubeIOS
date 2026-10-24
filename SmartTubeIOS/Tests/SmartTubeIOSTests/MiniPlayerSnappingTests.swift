@@ -127,4 +127,43 @@ struct MiniPlayerSnappingTests {
         #expect(far.x > 0)
         #expect(far.y < screen.height)
     }
+
+    @Test("Maximum width is the full width between the margins in portrait")
+    func maximumWidthPortrait() {
+        // Half the height (456 pt) would allow 810 pt; the screen width wins.
+        #expect(near(MiniPlayerSnapping.maximumWidth(screen: screen, obstructions: obstructions), 420 - 24))
+    }
+
+    @Test("Maximum width keeps the height at half the screen in landscape")
+    func maximumWidthLandscape() {
+        let landscape = CGSize(width: 912, height: 420)
+        let insets = MiniPlayerInsets(top: 0, leading: 68, bottom: 70, trailing: 68)
+        let maximum = MiniPlayerSnapping.maximumWidth(screen: landscape, obstructions: insets)
+        #expect(maximum == 373)
+        #expect(maximum / MiniPlayerSnapping.aspectRatio <= 210)
+    }
+
+    @Test("Scale 1 is the default size; scales are clamped to the minimum and maximum")
+    func scaledSizes() {
+        #expect(MiniPlayerSnapping.size(screen: screen, obstructions: obstructions, scale: 1) == size)
+        let big = MiniPlayerSnapping.size(screen: screen, obstructions: obstructions, scale: 10)
+        #expect(big == CGSize(width: 396, height: 223))
+        let small = MiniPlayerSnapping.size(screen: screen, obstructions: obstructions, scale: 0.1)
+        #expect(small == CGSize(width: 160, height: 90))
+    }
+
+    @Test("The landscape default is clamped to half the screen height")
+    func landscapeDefaultIsClamped() {
+        let landscape = CGSize(width: 912, height: 420)
+        let insets = MiniPlayerInsets(top: 0, leading: 68, bottom: 70, trailing: 68)
+        // 45% of 912 would be 410 pt wide (231 pt tall, more than half of 420).
+        let clamped = MiniPlayerSnapping.size(screen: landscape, obstructions: insets, scale: 1)
+        #expect(clamped.width == 373)
+    }
+
+    @Test("scale(forWidth:) inverts the default size")
+    func scaleForWidth() {
+        let scale = MiniPlayerSnapping.scale(forWidth: 378, screenWidth: 420)
+        #expect(near(scale, 2))
+    }
 }

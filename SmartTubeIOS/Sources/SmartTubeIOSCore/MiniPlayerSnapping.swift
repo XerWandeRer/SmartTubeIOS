@@ -50,6 +50,30 @@ public enum MiniPlayerSnapping {
         return CGSize(width: width, height: (width / aspectRatio).rounded())
     }
 
+    /// Largest width the user can pinch the mini player to: the full width between
+    /// the side margins, or the width whose 16:9 height is half the screen height,
+    /// whichever is smaller (never below `minimumWidth`).
+    public static func maximumWidth(screen: CGSize, obstructions: MiniPlayerInsets) -> CGFloat {
+        let fullWidth = screen.width - obstructions.leading - obstructions.trailing - 2 * margin
+        let halfHeightWidth = (screen.height / 2 * aspectRatio).rounded(.down)
+        return max(minimumWidth, min(fullWidth, halfHeightWidth).rounded(.down))
+    }
+
+    /// Size for a user-chosen `scale` of the default size (1 = `size(screenWidth:)`),
+    /// clamped between `minimumWidth` and `maximumWidth`. The default itself is clamped
+    /// too, so in landscape it never exceeds half the screen height.
+    public static func size(screen: CGSize, obstructions: MiniPlayerInsets, scale: CGFloat) -> CGSize {
+        let base = size(screenWidth: screen.width).width
+        let maximum = maximumWidth(screen: screen, obstructions: obstructions)
+        let width = min(max((base * scale).rounded(), minimumWidth), maximum)
+        return CGSize(width: width, height: (width / aspectRatio).rounded())
+    }
+
+    /// The scale that reproduces `width` on a screen of `screenWidth`.
+    public static func scale(forWidth width: CGFloat, screenWidth: CGFloat) -> CGFloat {
+        width / size(screenWidth: screenWidth).width
+    }
+
     /// Centre of the mini player when it rests in `corner`.
     ///
     /// - Parameters:
