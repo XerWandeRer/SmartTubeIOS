@@ -56,6 +56,10 @@ public final class PlayerOrientationController {
     /// re-present for another video) cancels it and inherits the portrait origin.
     @ObservationIgnored private var rotateBackPending = false
 
+    /// The last dismissal rotates the window back to portrait (the player forced
+    /// landscape). ResidentPlayerLayer waits for that rotation before collapsing.
+    private(set) var dismissRotatesToPortrait = false
+
     /// The orientations the player supports right now.
     var mask: UIInterfaceOrientationMask { policy.wantsLandscape ? .landscape : .portrait }
 
@@ -159,6 +163,7 @@ public final class PlayerOrientationController {
         isPresented = false
         let rotateBack = forcedLandscape
         forcedLandscape = false
+        dismissRotatesToPortrait = rotateBack
         orientationLog.notice("[PlayerOrientation] dismissed — rotateBackToPortrait=\(rotateBack)")
         guard rotateBack else { return }
         rotateBackPending = true

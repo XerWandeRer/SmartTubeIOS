@@ -40,8 +40,11 @@ struct ResidentPlayerLayer: View {
     @State private var progress: CGFloat = 1
     /// Progress while the expanded player is dragged down; overrides `progress`.
     @State private var collapseDragProgress: CGFloat?
-    /// Full screen height, for the collapse drag's travel.
-    @State private var screenHeight: CGFloat = 0
+    /// Full screen size: the collapse drag's travel, and whether the window is portrait.
+    @State private var screenSize: CGSize = .zero
+    /// Minimized while the window was still landscape: the collapse waits until the
+    /// window has rotated back to portrait.
+    @State private var isWaitingForPortrait = false
     /// Centre (screen coordinates) when the current drag began; nil when not dragging.
     @State private var dragStartCenter: CGPoint?
     /// Displacement from the current corner's anchor. Separate axes so the snap can
@@ -68,6 +71,11 @@ struct ResidentPlayerLayer: View {
     private static let relayoutAnimation = Animation.spring(response: 0.35, dampingFraction: 0.8)
     private static let gravityAnimation = Animation.easeInOut(duration: 0.25)
     private static let controlsFade = Animation.easeOut(duration: 0.15)
+    /// Longest wait for the rotation back to portrait before collapsing anyway.
+    private static let portraitWaitTimeout: Duration = .seconds(1.5)
+    /// The window takes its portrait size when the rotation starts; the system's
+    /// rotation animation runs about this long after that.
+    private static let rotationAnimationDuration: Duration = .milliseconds(400)
 
     /// Accessibility identifiers; UITests (MiniPlayerUITests, PlayerAndMiniPlayerUITests) query these.
     private enum AXID {
@@ -84,6 +92,12 @@ struct ResidentPlayerLayer: View {
 
     /// What the layer draws: the finger's progress while dragging, else `progress`.
     private var displayedProgress: CGFloat { collapseDragProgress ?? progress }
+
+    /// Status bar and home indicator are hidden while the player is mostly expanded, so
+    /// they switch midway through a drag instead of when it starts.
+    private var hidesSystemOverlays: Bool {
+        playerState.presentation != .hidden && displayedProgress > 0.5
+    }
 
     /// PlayerView's controls fade out over the first 30 % of a collapse.
     private var controlsOpacity: Double {
@@ -110,10 +124,13 @@ struct ResidentPlayerLayer: View {
                     .ignoresSafeArea()
                     // Covers the tabs while expanded; the mini player leaves them usable.
                     .allowsHitTesting(!isMini)
-                    .onGeometryChange(for: CGFloat.self) { proxy in
-                        proxy.size.height + proxy.safeAreaInsets.top + proxy.safeAreaInsets.bottom
+                    .onGeometryChange(for: CGSize.self) { proxy in
+                        let insets = proxy.safeAreaInsets
+                        return CGSize(
+                            width: proxy.size.width + insets.leading + insets.trailing,
+                            height: proxy.size.height + insets.top + insets.bottom)
                     } action: {
-                        screenHeight = $0
+                        screenSize = $0
                     }
 
                 videoLayer
@@ -136,19 +153,43 @@ struct ResidentPlayerLayer: View {
         .onChange(of: playerState.presentation) { _, presentation in
             presentationChanged(presentation)
         }
+        .onChange(of: screenSize) { _, size in
+            guard isWaitingForPortrait, size.height > size.width else { return }
+            Task { @MainActor in
+                try? await Task.sleep(for: Self.rotationAnimationDuration)
+                finishLandscapeCollapse(reason: "portrait")
+            }
+        }
+        .statusBarHidden(hidesSystemOverlays)
+        .persistentSystemOverlays(hidesSystemOverlays ? .hidden : .automatic)
     }
 
     private func presentationChanged(_ presentation: PlayerStateStore.Presentation) {
         residentLog.notice("presentation=\(String(describing: presentation)) progress=\(progress)")
         switch presentation {
         case .fullScreen:
+            isWaitingForPortrait = false
             withAnimation(transitionAnimation) { progress = 1 }
         case .miniPlayer:
-            withAnimation(transitionAnimation) { progress = 0 }
+            // A landscape player rotating back to portrait (XER-10) collapses only once
+            // the window is portrait: shrinking first would land the mini player on a
+            // landscape layout of the tabs that is about to change.
+            if screenSize.width > screenSize.height, progress > 0,
+                PlayerOrientationController.shared.dismissRotatesToPortrait
+            {
+                isWaitingForPortrait = true
+                Task { @MainActor in
+                    try? await Task.sleep(for: Self.portraitWaitTimeout)
+                    finishLandscapeCollapse(reason: "timeout")
+                }
+            } else {
+                withAnimation(transitionAnimation) { progress = 0 }
+            }
         case .hidden:
             // Closed: the next video opens straight at full screen.
             progress = 1
             collapseDragProgress = nil
+            isWaitingForPortrait = false
             dragStartCenter = nil
             offsetX = 0
             offsetY = 0
@@ -160,9 +201,16 @@ struct ResidentPlayerLayer: View {
         reduceMotion ? Self.reducedMotionAnimation : .spring(Self.presentationSpring)
     }
 
+    private func finishLandscapeCollapse(reason: String) {
+        guard isWaitingForPortrait, playerState.presentation == .miniPlayer else { return }
+        isWaitingForPortrait = false
+        residentLog.notice("landscape collapse continues — \(reason) size=\(screenSize)")
+        withAnimation(transitionAnimation) { progress = 0 }
+    }
+
     // MARK: - Collapse drag
 
-    private var collapseTravel: CGFloat { PlayerPanGesture.collapseTravel(screenHeight: screenHeight) }
+    private var collapseTravel: CGFloat { PlayerPanGesture.collapseTravel(screenHeight: screenSize.height) }
 
     /// The expanded player follows a downward drag (translation from touch-down).
     private func collapseDragChanged(_ translation: CGFloat) {
