@@ -99,14 +99,16 @@ public final class PlayerStateStore {
         videoSize = VideoSize(videoID: videoID, size: size)
     }
 
-    /// Width / height of the video on screen. Until its decoded size is known, a guess
-    /// from the Short flag.
+    /// Width / height of the video on screen: the decoded size once known, until then
+    /// the full player's orientation decision for this video, else the Short flag.
     var videoAspectRatio: CGFloat {
         if let videoSize, videoSize.videoID == vm.currentVideoId, videoSize.size.height > 0 {
             return videoSize.size.width / videoSize.size.height
         }
-        return (vm.currentVideo ?? currentVideo)?.isShort == true
-            ? ResidentPlayerGeometry.defaultShortAspectRatio : ResidentPlayerGeometry.defaultAspectRatio
+        let video = vm.currentVideo ?? currentVideo
+        let policy = PlayerOrientationController.shared.policy
+        let isLandscape = video.map { policy.videoID == $0.id ? policy.videoIsLandscape : !$0.isShort } ?? true
+        return isLandscape ? ResidentPlayerGeometry.defaultAspectRatio : ResidentPlayerGeometry.defaultShortAspectRatio
     }
 
     // MARK: - Owned objects
