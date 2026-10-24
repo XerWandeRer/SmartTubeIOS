@@ -12,11 +12,9 @@ private let storeLog = Logger(subsystem: "com.void.smarttube.app", category: "Pl
 
 /// A UIView that owns an AVPlayerLayer for the lifetime of the app.
 /// Its reference lives in PlayerStateStore, so the layer — and the AVPlayer
-/// connection — survive PlayerView dismiss/re-present cycles (mini-player).
+/// connection — survive PlayerView appearing and disappearing.
 ///
-/// Embed it as a subview in full-screen and mini-player contexts.
-/// UIView.addSubview automatically removes it from the previous parent,
-/// so no explicit removeFromSuperview is needed when transplanting.
+/// ResidentPlayerLayer hosts it once, for both the full-screen and the mini player.
 final class PersistentPlayerHostView: UIView {
 
     let playerLayer = AVPlayerLayer()
@@ -82,6 +80,31 @@ public final class PlayerStateStore {
         vm.isLoading ? vm.history.last : currentVideo
     }
 
+    // MARK: - Video size
+
+    /// Decoded size of a video, reported once AVPlayer knows it.
+    struct VideoSize: Equatable {
+        let videoID: String
+        let size: CGSize
+    }
+
+    /// The last decoded size PlayerView reported.
+    private(set) var videoSize: VideoSize?
+
+    func videoSizeKnown(videoID: String, size: CGSize) {
+        videoSize = VideoSize(videoID: videoID, size: size)
+    }
+
+    /// Width / height of the video on screen. Until its decoded size is known, a guess
+    /// from the Short flag.
+    var videoAspectRatio: CGFloat {
+        if let videoSize, videoSize.videoID == vm.currentVideoId, videoSize.size.height > 0 {
+            return videoSize.size.width / videoSize.size.height
+        }
+        return (vm.currentVideo ?? currentVideo)?.isShort == true
+            ? ResidentPlayerGeometry.defaultShortAspectRatio : ResidentPlayerGeometry.defaultAspectRatio
+    }
+
     // MARK: - Imperative dismiss hook
 
     /// Set by LandscapePresenter's coordinator when a full-screen player is presented.
@@ -95,8 +118,8 @@ public final class PlayerStateStore {
     /// The single PlaybackViewModel for the app. Lives for the app's lifetime.
     public let vm: PlaybackViewModel
 
-    /// The UIView that owns the AVPlayerLayer. Never deallocated; transplanted
-    /// between full-screen and mini-player containers via UIView.addSubview.
+    /// The UIView that owns the AVPlayerLayer. Never deallocated; hosted by
+    /// ResidentPlayerLayer in both the full-screen and the mini player.
     let playerHostView: PersistentPlayerHostView
 
     // MARK: - Init
@@ -110,8 +133,8 @@ public final class PlayerStateStore {
         vm.onSystemBackgroundPause = { [weak self] in self?.detachVideoLayerForBackground() }
         // UI tests start the mini player from its defaults (corner and size are persisted).
         if ProcessInfo.processInfo.arguments.contains("--uitesting-reset-mini-player") {
-            UserDefaults.standard.removeObject(forKey: MiniPlayerView.cornerDefaultsKey)
-            UserDefaults.standard.removeObject(forKey: MiniPlayerView.scaleDefaultsKey)
+            UserDefaults.standard.removeObject(forKey: ResidentPlayerLayer.cornerDefaultsKey)
+            UserDefaults.standard.removeObject(forKey: ResidentPlayerLayer.scaleDefaultsKey)
         }
         didBecomeActiveObserver = NotificationCenter.default.addObserver(
             forName: UIApplication.didBecomeActiveNotification,

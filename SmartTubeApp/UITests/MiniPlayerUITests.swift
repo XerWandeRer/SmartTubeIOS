@@ -427,3 +427,42 @@ final class MiniPlayerUITests: XCTestCase {
         XCTAssertEqual(frame.width / frame.height, 9.0 / 16.0, accuracy: 0.03, "The window is 9:16")
     }
 }
+
+// MARK: - Resident player layer (XER-14)
+//
+// The full-screen player and the mini player are one layer above the tabs. Expanded,
+// it covers the tabs (they are hidden from VoiceOver too, but XCUITest still lists
+// elements hidden that way, so these tests check hit-testing instead); minimized, only
+// the mini player window is on top.
+
+extension MiniPlayerUITests {
+    func testExpandedPlayerCoversTabs() throws {
+        try XCTSkipIf(Self.skipAllTests, Self.skipReason)
+        try openPlayerFromHome()
+        let chipBar = app.scrollViews["home.chipBar"].firstMatch
+        let covered = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == false"), object: chipBar)
+        XCTAssertEqual(
+            XCTWaiter().wait(for: [covered], timeout: 3), .completed,
+            "Home must not be reachable behind the expanded player")
+        attachScreenshot("expanded")
+        XCTAssertEqual(
+            app.buttons.matching(identifier: "player.backButton").count, 1,
+            "Exactly one player is on screen")
+        XCTAssertFalse(miniPlayerBar.exists, "The mini player is not an element while expanded")
+
+        minimizePlayer()
+        XCTAssertTrue(miniPlayerBar.waitForExistence(timeout: 5), "The back button minimizes the player")
+        let reachable = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: chipBar)
+        XCTAssertEqual(
+            XCTWaiter().wait(for: [reachable], timeout: 5), .completed,
+            "Home is reachable again under the mini player")
+    }
+
+    func testMiniPlayerHasNoFullScreenControls() throws {
+        try XCTSkipIf(Self.skipAllTests, Self.skipReason)
+        try showMiniPlayer()
+        attachScreenshot("mini")
+        XCTAssertFalse(playerTitle.exists, "player.titleLabel must not be visible in the mini player")
+        XCTAssertFalse(backButton.exists, "player.backButton must not be visible in the mini player")
+    }
+}

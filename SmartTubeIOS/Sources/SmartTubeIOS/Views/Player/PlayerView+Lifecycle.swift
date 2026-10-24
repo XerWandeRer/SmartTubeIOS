@@ -80,23 +80,17 @@ extension PlayerView {
     private var playerContentView: some View {
         GeometryReader { geo in
             ZStack {
-                Color.black.ignoresSafeArea()
-
                 #if os(iOS)
-                // FullScreenPlayerLayerView: wraps PersistentPlayerHostView so the AVPlayerLayer
-                // survives PlayerView dismiss/re-present cycles (mini-player feature).
-                FullScreenPlayerLayerView(
-                    hostView: playerState.playerHostView,
-                    videoGravity: store.settings.videoGravityMode.avGravity
-                )
-                .ignoresSafeArea()
-                .accessibilityHidden(true)
+                // The video and the black backdrop belong to ResidentPlayerLayer, which
+                // keeps the AVPlayerLayer on screen in both the full-screen and the mini
+                // player, so PlayerView itself is transparent here.
                 // Audio-only mode: overlay the thumbnail over the (hidden) player layer.
                 // The AVPlayerLayer stays in the hierarchy so PiP attachment is undisturbed.
                 if vm.isAudioOnlyMode {
                     audioOnlyThumbnailOverlay
                 }
                 #elseif os(tvOS)
+                Color.black.ignoresSafeArea()
                 // PlayerAVLayerView: bare AVPlayerLayer without AVPlayerViewController.
                 // AVPlayerViewController (VideoPlayer) dominates the UIKit accessibility
                 // tree, making all overlaid SwiftUI elements invisible to XCUITest.
@@ -107,6 +101,7 @@ extension PlayerView {
                     audioOnlyThumbnailOverlay
                 }
                 #elseif os(macOS)
+                Color.black.ignoresSafeArea()
                 PlayerNSLayerView(player: vm.player, videoGravity: store.settings.videoGravityMode.avGravity)
                     .ignoresSafeArea()
                     .accessibilityHidden(true)
@@ -319,12 +314,13 @@ extension PlayerView {
             }
             .offset(x: slideOffset)
         }
-        .background(Color.black.ignoresSafeArea())
         #if os(iOS)
         .toast(message: $scaleToast)
         .toast(message: $seekToastMessage)
         .toast(message: $qualityToastMessage)
         .toast(message: Binding(get: { vm.toastMessage }, set: { vm.toastMessage = $0 }))
+        #else
+        .background(Color.black.ignoresSafeArea())
         #endif
     }
 
@@ -715,10 +711,17 @@ extension PlayerView {
             switch phase {
             case .background:
                 isInBackground = true
+                // iOS: PlayerStateStore and the rate observer own background playback,
+                // PiP and resuming (XER-7, XER-8). The player used to live in a UIKit
+                // cover where scenePhase never changed, so these never ran there.
+                #if !os(iOS)
                 if isVisible { vm.handleBackground() }
+                #endif
             case .active:
                 isInBackground = false
+                #if !os(iOS)
                 if isVisible { vm.handleForeground() }
+                #endif
             default:
                 break
             }
@@ -758,6 +761,7 @@ extension PlayerView {
                     let size = vm.player.currentItem?.presentationSize, size.width > 0, size.height > 0
                 {
                     PlayerOrientationController.shared.videoSizeKnown(videoID: videoID, size: size)
+                    playerState.videoSizeKnown(videoID: videoID, size: size)
                     return
                 }
                 try? await Task.sleep(for: .milliseconds(250))
