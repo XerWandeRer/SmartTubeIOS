@@ -4,6 +4,27 @@ import SwiftUI
 
 private let panLog = CrashlyticsLogger(category: "Player")
 
+/// Window frame of the progress bar while the controls show it; nil otherwise.
+struct PlayerScrubberFrameKey: PreferenceKey {
+    static let defaultValue: CGRect? = nil
+
+    static func reduce(value: inout CGRect?, nextValue: () -> CGRect?) {
+        value = nextValue() ?? value
+    }
+}
+
+extension View {
+    /// Reports this view's window frame as the progress bar, so the player's pan leaves
+    /// touches there to the scrub drag.
+    func reportsScrubberFrame() -> some View {
+        background {
+            GeometryReader { geo in
+                Color.clear.preference(key: PlayerScrubberFrameKey.self, value: geo.frame(in: .global))
+            }
+        }
+    }
+}
+
 // MARK: - PlayerView pan
 //
 // The single pan from PlayerPanGestureInstaller, after its axis is locked:
