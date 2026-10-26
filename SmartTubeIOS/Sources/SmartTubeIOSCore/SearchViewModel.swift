@@ -181,7 +181,11 @@ public final class SearchViewModel {
 public final class ChannelViewModel {
 
     public private(set) var channel: Channel?
+    /// The channel's Videos tab, newest first. This is the only list that pages.
     public private(set) var videos: [Video] = []
+    /// Shorts from the channel's Home tab. The Videos tab does not list Shorts, so they come
+    /// from the Home shelf and are not paged.
+    public private(set) var shorts: [Video] = []
     public private(set) var isLoading: Bool = false
     public var error: Error?
 
@@ -198,33 +202,49 @@ public final class ChannelViewModel {
         Task { await loadAsync(channelId: channelId) }
     }
 
-    private func loadAsync(channelId: String) async {
+    func loadAsync(channelId: String) async {
         isLoading = true
         defer { isLoading = false }
         do {
-            let (ch, group) = try await api.fetchChannel(channelId: channelId)
+            let (ch, home) = try await api.fetchChannel(channelId: channelId)
             channel = ch
-            videos = group.videos
-            nextPageToken = group.nextPageToken
+            // The Home tab's continuation tokens are per shelf and return no videos, so paging
+            // them stopped the list after the first page (#138). Page the Videos tab instead,
+            // and keep Home for the header and the Shorts shelf.
+            let grid = try? await retryWithBackoff(label: "ChannelVM") {
+                try await api.fetchChannelVideos(channelId: ch.id, continuationToken: nil)
+            }
+            if let grid, !grid.videos.isEmpty {
+                videos = grid.videos
+                nextPageToken = grid.nextPageToken
+            } else {
+                // No Videos tab (or the request failed): show what Home has, as before.
+                videos = home.videos
+                nextPageToken = home.nextPageToken
+            }
+            var seen = Set<String>()
+            shorts = (home.videos + videos).filter { $0.isShort && seen.insert($0.id).inserted }
         } catch {
             self.error = error
         }
     }
 
     public func loadMore() {
+        Task { await loadMoreAsync() }
+    }
+
+    func loadMoreAsync() async {
         guard let id = channel?.id, let token = nextPageToken, !isLoading else { return }
-        Task {
-            isLoading = true
-            defer { isLoading = false }
-            do {
-                let group = try await retryWithBackoff(label: "ChannelVM") {
-                    try await api.fetchChannelVideos(channelId: id, continuationToken: token)
-                }
-                videos.append(contentsOf: group.videos)
-                nextPageToken = group.nextPageToken
-            } catch {
-                self.error = error
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            let group = try await retryWithBackoff(label: "ChannelVM") {
+                try await api.fetchChannelVideos(channelId: id, continuationToken: token)
             }
+            videos.append(contentsOf: group.videos)
+            nextPageToken = group.nextPageToken
+        } catch {
+            self.error = error
         }
     }
 
@@ -236,6 +256,7 @@ public final class ChannelViewModel {
                 for await note in NotificationCenter.default.notifications(named: .hideVideoFromFeed) {
                     guard let self, let videoId = note.userInfo?["videoId"] as? String else { continue }
                     self.videos.removeAll { $0.id == videoId }
+                    self.shorts.removeAll { $0.id == videoId }
                 }
             })
         hideObserverTasks.append(
@@ -243,6 +264,7 @@ public final class ChannelViewModel {
                 for await note in NotificationCenter.default.notifications(named: .hideChannelFromFeed) {
                     guard let self, let channelId = note.userInfo?["channelId"] as? String else { continue }
                     self.videos.removeAll { $0.channelId == channelId }
+                    self.shorts.removeAll { $0.channelId == channelId }
                 }
             })
     }
