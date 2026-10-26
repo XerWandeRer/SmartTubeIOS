@@ -1,4 +1,5 @@
 import Foundation
+import SmartTubeIOSCore
 
 extension AuthService {
 
@@ -29,6 +30,8 @@ extension AuthService {
         accountName = snap.accountName
         accountAvatarURL = snap.accountAvatarURL
         sapisid = snap.sapisid
+        activePageId = snap.pageId
+        ActiveChannel.shared.set(pageId: snap.pageId)
         // If the stored access token has already expired, clear it so that
         // view observers (e.g. HomeView.task(id: auth.accessToken)) don't fire
         // API requests with a stale token. scheduleProactiveRefresh() will

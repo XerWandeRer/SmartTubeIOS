@@ -117,6 +117,12 @@ public struct SettingsView: View {
                     .clipShape(Circle())
                     Text(auth.accountName ?? "Unknown")
                 }
+                NavigationLink {
+                    ChannelSwitcherView()
+                } label: {
+                    LabeledContent("Channel", value: auth.activeChannel?.name ?? "")
+                }
+                .accessibilityIdentifier("settings.channelLink")
                 Button("Sign Out", role: .destructive) { auth.signOut() }
             } else {
                 Button("Sign in with Google") { showSignIn = true }

@@ -218,6 +218,9 @@ struct MainTabView: View {
         .onReceive(NotificationCenter.default.publisher(for: .navigateToSearch)) { _ in
             selectedTab = .search
         }
+        .onReceive(NotificationCenter.default.publisher(for: .activeChannelDidChange)) { _ in
+            selectedTab = .home
+        }
         #if os(iOS)
         // App Intents / Spotlight (see AppEntry.handleOpenURL).
         .onReceive(NotificationCenter.default.publisher(for: .smartTubeOpenSearch)) { note in
@@ -366,6 +369,9 @@ struct MainTVTabView: View {
             }
         }
         .environment(searchVM)
+        .onReceive(NotificationCenter.default.publisher(for: .activeChannelDidChange)) { _ in
+            selectedTab = .home
+        }
     }
 }
 #endif
@@ -414,6 +420,9 @@ struct MainSidebarView: View {
                 NavigationStack { (selectedSection ?? .home).destination(api: api) }
             }
             .environment(searchVM)
+            .onReceive(NotificationCenter.default.publisher(for: .activeChannelDidChange)) { _ in
+                selectedSection = .home
+            }
 
             // Full-window player overlay — avoids macOS sheet coordinate issues that
             // prevent XCUITest click events from reaching controls inside a popover window.

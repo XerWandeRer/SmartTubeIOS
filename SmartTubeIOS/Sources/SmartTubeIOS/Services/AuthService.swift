@@ -34,6 +34,10 @@ public final class AuthService {
     public internal(set) var isSignedIn: Bool = false
     public internal(set) var accountName: String?
     public internal(set) var accountAvatarURL: URL?
+    /// Every channel of the signed-in account (primary + Brand Accounts), from accounts_list.
+    public internal(set) var channels: [YouTubeChannel] = []
+    /// Selected Brand Account; nil = primary account. Mirrored into ActiveChannel.shared.
+    public internal(set) var activePageId: String?
     public var error: Error?
 
     /// Non-nil while waiting for the user to enter the code at youtube.com/activate.
@@ -234,6 +238,7 @@ public final class AuthService {
         tokenExpiry = nil
         accountName = nil
         accountAvatarURL = nil
+        resetChannels()
         isSignedIn = false
         pendingActivation = nil
         clearKeychain()
@@ -253,6 +258,7 @@ public final class AuthService {
         tokenExpiry = nil
         accountName = nil
         accountAvatarURL = nil
+        resetChannels()
         isSignedIn = false
         pendingActivation = nil
     }

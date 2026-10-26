@@ -117,6 +117,13 @@ public final class BrowseViewModel {
                     self.removeChannel(id: channelId)
                 }
             })
+        hideObserverTasks.append(
+            Task { [weak self] in
+                for await _ in NotificationCenter.default.notifications(named: .activeChannelDidChange) {
+                    guard let self, self.hasAuthToken else { continue }
+                    self.loadContent(refresh: true, source: "channelSwitch")
+                }
+            })
     }
 
     public func removeVideo(id: String) {
