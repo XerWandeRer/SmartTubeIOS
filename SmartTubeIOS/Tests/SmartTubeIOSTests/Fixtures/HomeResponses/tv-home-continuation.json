@@ -1,0 +1,793 @@
+{
+ "continuationContents": {
+  "horizontalListContinuation": {
+   "continuations": [
+    {
+     "nextContinuationData": {
+      "continuation": "CONTINUATION_TOKEN_1"
+     }
+    }
+   ],
+   "items": [
+    {
+     "tileRenderer": {
+      "contentId": "personal001",
+      "contentType": "TILE_CONTENT_TYPE_VIDEO",
+      "header": {
+       "tileHeaderRenderer": {
+        "thumbnailOverlays": [
+         {
+          "thumbnailOverlayTimeStatusRenderer": {
+           "style": "DEFAULT",
+           "text": {
+            "simpleText": "15:18"
+           }
+          }
+         }
+        ]
+       }
+      },
+      "metadata": {
+       "tileMetadataRenderer": {
+        "lines": [
+         {
+          "lineRenderer": {
+           "items": [
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": "Channel 1"
+              }
+             }
+            }
+           ]
+          }
+         },
+         {
+          "lineRenderer": {
+           "items": [
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": ""
+              }
+             }
+            },
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": "1.9M views"
+              }
+             }
+            },
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": "•"
+              }
+             }
+            },
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": "4 days ago"
+              }
+             }
+            }
+           ]
+          }
+         }
+        ],
+        "title": {
+         "simpleText": "Personal video 1"
+        }
+       }
+      },
+      "onSelectCommand": {
+       "watchEndpoint": {
+        "videoId": "personal001"
+       }
+      },
+      "style": "TILE_STYLE_YTLR_DEFAULT"
+     }
+    },
+    {
+     "tileRenderer": {
+      "contentId": "personal002",
+      "contentType": "TILE_CONTENT_TYPE_VIDEO",
+      "header": {
+       "tileHeaderRenderer": {
+        "thumbnailOverlays": [
+         {
+          "thumbnailOverlayTimeStatusRenderer": {
+           "style": "DEFAULT",
+           "text": {
+            "simpleText": "12:18"
+           }
+          }
+         }
+        ]
+       }
+      },
+      "metadata": {
+       "tileMetadataRenderer": {
+        "lines": [
+         {
+          "lineRenderer": {
+           "items": [
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": "Channel 2"
+              }
+             }
+            }
+           ]
+          }
+         },
+         {
+          "lineRenderer": {
+           "items": [
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": "14K views"
+              }
+             }
+            },
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": "•"
+              }
+             }
+            },
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": "2 hours ago"
+              }
+             }
+            }
+           ]
+          }
+         }
+        ],
+        "title": {
+         "simpleText": "Personal video 2"
+        }
+       }
+      },
+      "onSelectCommand": {
+       "watchEndpoint": {
+        "videoId": "personal002"
+       }
+      },
+      "style": "TILE_STYLE_YTLR_DEFAULT"
+     }
+    },
+    {
+     "tileRenderer": {
+      "contentId": "personal003",
+      "contentType": "TILE_CONTENT_TYPE_VIDEO",
+      "header": {
+       "tileHeaderRenderer": {
+        "thumbnailOverlays": [
+         {
+          "thumbnailOverlayTimeStatusRenderer": {
+           "style": "DEFAULT",
+           "text": {
+            "simpleText": "21:51"
+           }
+          }
+         }
+        ]
+       }
+      },
+      "metadata": {
+       "tileMetadataRenderer": {
+        "lines": [
+         {
+          "lineRenderer": {
+           "items": [
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": "Channel 3"
+              }
+             }
+            }
+           ]
+          }
+         },
+         {
+          "lineRenderer": {
+           "items": [
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": "305K views"
+              }
+             }
+            },
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": "•"
+              }
+             }
+            },
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": "3 days ago"
+              }
+             }
+            }
+           ]
+          }
+         }
+        ],
+        "title": {
+         "simpleText": "Personal video 3"
+        }
+       }
+      },
+      "onSelectCommand": {
+       "watchEndpoint": {
+        "videoId": "personal003"
+       }
+      },
+      "style": "TILE_STYLE_YTLR_DEFAULT"
+     }
+    },
+    {
+     "tileRenderer": {
+      "contentId": "personal004",
+      "contentType": "TILE_CONTENT_TYPE_VIDEO",
+      "header": {
+       "tileHeaderRenderer": {
+        "thumbnailOverlays": [
+         {
+          "thumbnailOverlayTimeStatusRenderer": {
+           "style": "DEFAULT",
+           "text": {
+            "simpleText": "5:28"
+           }
+          }
+         }
+        ]
+       }
+      },
+      "metadata": {
+       "tileMetadataRenderer": {
+        "lines": [
+         {
+          "lineRenderer": {
+           "items": [
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": "Channel 4"
+              }
+             }
+            }
+           ]
+          }
+         },
+         {
+          "lineRenderer": {
+           "items": [
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": ""
+              }
+             }
+            },
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": "19K views"
+              }
+             }
+            },
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": "•"
+              }
+             }
+            },
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": "4 days ago"
+              }
+             }
+            }
+           ]
+          }
+         }
+        ],
+        "title": {
+         "simpleText": "Personal video 4"
+        }
+       }
+      },
+      "onSelectCommand": {
+       "watchEndpoint": {
+        "videoId": "personal004"
+       }
+      },
+      "style": "TILE_STYLE_YTLR_DEFAULT"
+     }
+    },
+    {
+     "tileRenderer": {
+      "contentId": "personal005",
+      "contentType": "TILE_CONTENT_TYPE_VIDEO",
+      "header": {
+       "tileHeaderRenderer": {
+        "thumbnailOverlays": [
+         {
+          "thumbnailOverlayTimeStatusRenderer": {
+           "style": "DEFAULT",
+           "text": {
+            "simpleText": "10:25"
+           }
+          }
+         }
+        ]
+       }
+      },
+      "metadata": {
+       "tileMetadataRenderer": {
+        "lines": [
+         {
+          "lineRenderer": {
+           "items": [
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": "Channel 5"
+              }
+             }
+            }
+           ]
+          }
+         },
+         {
+          "lineRenderer": {
+           "items": [
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": "30K views"
+              }
+             }
+            },
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": "•"
+              }
+             }
+            },
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": "3 hours ago"
+              }
+             }
+            }
+           ]
+          }
+         }
+        ],
+        "title": {
+         "simpleText": "Personal video 5"
+        }
+       }
+      },
+      "onSelectCommand": {
+       "watchEndpoint": {
+        "videoId": "personal005"
+       }
+      },
+      "style": "TILE_STYLE_YTLR_DEFAULT"
+     }
+    },
+    {
+     "tileRenderer": {
+      "contentId": "personal006",
+      "contentType": "TILE_CONTENT_TYPE_VIDEO",
+      "header": {
+       "tileHeaderRenderer": {
+        "thumbnailOverlays": [
+         {
+          "thumbnailOverlayTimeStatusRenderer": {
+           "style": "DEFAULT",
+           "text": {
+            "simpleText": "30:53"
+           }
+          }
+         }
+        ]
+       }
+      },
+      "metadata": {
+       "tileMetadataRenderer": {
+        "lines": [
+         {
+          "lineRenderer": {
+           "items": [
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": "Channel 6"
+              }
+             }
+            }
+           ]
+          }
+         },
+         {
+          "lineRenderer": {
+           "items": [
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": ""
+              }
+             }
+            },
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": "657K views"
+              }
+             }
+            },
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": "•"
+              }
+             }
+            },
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": "1 day ago"
+              }
+             }
+            }
+           ]
+          }
+         }
+        ],
+        "title": {
+         "simpleText": "Personal video 6"
+        }
+       }
+      },
+      "onSelectCommand": {
+       "watchEndpoint": {
+        "videoId": "personal006"
+       }
+      },
+      "style": "TILE_STYLE_YTLR_DEFAULT"
+     }
+    },
+    {
+     "tileRenderer": {
+      "contentId": "personal007",
+      "contentType": "TILE_CONTENT_TYPE_VIDEO",
+      "header": {
+       "tileHeaderRenderer": {
+        "thumbnailOverlays": [
+         {
+          "thumbnailOverlayTimeStatusRenderer": {
+           "style": "DEFAULT",
+           "text": {
+            "simpleText": "8:31"
+           }
+          }
+         }
+        ]
+       }
+      },
+      "metadata": {
+       "tileMetadataRenderer": {
+        "lines": [
+         {
+          "lineRenderer": {
+           "items": [
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": "Channel 7"
+              }
+             }
+            }
+           ]
+          }
+         },
+         {
+          "lineRenderer": {
+           "items": [
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": "85K views"
+              }
+             }
+            },
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": "•"
+              }
+             }
+            },
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": "23 hours ago"
+              }
+             }
+            }
+           ]
+          }
+         }
+        ],
+        "title": {
+         "simpleText": "Personal video 7"
+        }
+       }
+      },
+      "onSelectCommand": {
+       "watchEndpoint": {
+        "videoId": "personal007"
+       }
+      },
+      "style": "TILE_STYLE_YTLR_DEFAULT"
+     }
+    },
+    {
+     "tileRenderer": {
+      "contentId": "personal008",
+      "contentType": "TILE_CONTENT_TYPE_VIDEO",
+      "header": {
+       "tileHeaderRenderer": {
+        "thumbnailOverlays": [
+         {
+          "thumbnailOverlayTimeStatusRenderer": {
+           "style": "DEFAULT",
+           "text": {
+            "simpleText": "13:01"
+           }
+          }
+         }
+        ]
+       }
+      },
+      "metadata": {
+       "tileMetadataRenderer": {
+        "lines": [
+         {
+          "lineRenderer": {
+           "items": [
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": "Channel 8"
+              }
+             }
+            }
+           ]
+          }
+         },
+         {
+          "lineRenderer": {
+           "items": [
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": "338K views"
+              }
+             }
+            },
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": "•"
+              }
+             }
+            },
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": "2 days ago"
+              }
+             }
+            }
+           ]
+          }
+         }
+        ],
+        "title": {
+         "simpleText": "Personal video 8"
+        }
+       }
+      },
+      "onSelectCommand": {
+       "watchEndpoint": {
+        "videoId": "personal008"
+       }
+      },
+      "style": "TILE_STYLE_YTLR_DEFAULT"
+     }
+    },
+    {
+     "tileRenderer": {
+      "contentId": "personal009",
+      "contentType": "TILE_CONTENT_TYPE_VIDEO",
+      "header": {
+       "tileHeaderRenderer": {
+        "thumbnailOverlays": [
+         {
+          "thumbnailOverlayTimeStatusRenderer": {
+           "style": "DEFAULT",
+           "text": {
+            "simpleText": "10:52"
+           }
+          }
+         }
+        ]
+       }
+      },
+      "metadata": {
+       "tileMetadataRenderer": {
+        "lines": [
+         {
+          "lineRenderer": {
+           "items": [
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": "Channel 9"
+              }
+             }
+            }
+           ]
+          }
+         },
+         {
+          "lineRenderer": {
+           "items": [
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": "88K views"
+              }
+             }
+            },
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": "•"
+              }
+             }
+            },
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": "2 days ago"
+              }
+             }
+            }
+           ]
+          }
+         }
+        ],
+        "title": {
+         "simpleText": "Personal video 9"
+        }
+       }
+      },
+      "onSelectCommand": {
+       "watchEndpoint": {
+        "videoId": "personal009"
+       }
+      },
+      "style": "TILE_STYLE_YTLR_DEFAULT"
+     }
+    },
+    {
+     "tileRenderer": {
+      "contentId": "personal010",
+      "contentType": "TILE_CONTENT_TYPE_VIDEO",
+      "header": {
+       "tileHeaderRenderer": {
+        "thumbnailOverlays": [
+         {
+          "thumbnailOverlayTimeStatusRenderer": {
+           "style": "DEFAULT",
+           "text": {
+            "simpleText": "8:16"
+           }
+          }
+         }
+        ]
+       }
+      },
+      "metadata": {
+       "tileMetadataRenderer": {
+        "lines": [
+         {
+          "lineRenderer": {
+           "items": [
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": "Channel 10"
+              }
+             }
+            }
+           ]
+          }
+         },
+         {
+          "lineRenderer": {
+           "items": [
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": ""
+              }
+             }
+            },
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": "116K views"
+              }
+             }
+            },
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": "•"
+              }
+             }
+            },
+            {
+             "lineItemRenderer": {
+              "text": {
+               "simpleText": "5 days ago"
+              }
+             }
+            }
+           ]
+          }
+         }
+        ],
+        "title": {
+         "simpleText": "Personal video 10"
+        }
+       }
+      },
+      "onSelectCommand": {
+       "watchEndpoint": {
+        "videoId": "personal010"
+       }
+      },
+      "style": "TILE_STYLE_YTLR_DEFAULT"
+     }
+    }
+   ]
+  }
+ }
+}

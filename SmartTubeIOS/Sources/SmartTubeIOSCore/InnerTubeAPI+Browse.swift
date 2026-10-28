@@ -42,7 +42,8 @@ extension InnerTubeAPI {
             ? try await postTV(endpoint: "browse", body: body)
             : try await post(endpoint: "browse", body: body)
         updateVisitorData(from: data)
-        return try parseVideoGroup(from: data, title: BrowseSection.SectionType.home.defaultTitle)
+        return try parseVideoGroup(
+            from: removingCuratedHomeShelves(from: data), title: BrowseSection.SectionType.home.defaultTitle)
     }
 
     /// Fetches the home feed as multiple named shelves (TYPE_ROW in Android).
@@ -62,7 +63,7 @@ extension InnerTubeAPI {
             ? try await postTV(endpoint: "browse", body: body)
             : try await post(endpoint: "browse", body: body)
         updateVisitorData(from: data)
-        let rows = parseVideoGroupRows(from: data)
+        let rows = parseVideoGroupRows(from: removingCuratedHomeShelves(from: data))
         tubeLog.notice("fetchHomeRows → \(rows.count, privacy: .public) shelves")
         let rowShortsDetail = rows.map { row -> String in
             let s = row.videos.filter { $0.isShort }.count
@@ -70,6 +71,17 @@ extension InnerTubeAPI {
         }.joined(separator: ", ")
         tubeLog.notice("fetchHomeRows shelf detail: [\(rowShortsDetail, privacy: .public)]")
         return rows
+    }
+
+    /// Drops the shelves YouTube curates for everyone (see `HomeShelfFilter`) so the
+    /// flattened home feed only holds the account's own recommendations. Shared by
+    /// `fetchHome` and `fetchHomeRows`, first page and continuations alike.
+    private func removingCuratedHomeShelves(from data: [String: Any]) -> [String: Any] {
+        let (filtered, removedTitles) = HomeShelfFilter.removingCuratedShelves(from: data)
+        if !removedTitles.isEmpty {
+            tubeLog.notice("home: dropped curated shelves \(removedTitles, privacy: .public)")
+        }
+        return filtered
     }
 
     // MARK: - Subscriptions
