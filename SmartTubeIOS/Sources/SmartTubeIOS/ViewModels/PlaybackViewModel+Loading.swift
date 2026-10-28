@@ -363,6 +363,25 @@ extension PlaybackViewModel {
         #endif
     }
 
+    /// Longest a load waits for the PO token prefetch before an iOS or fallback attempt.
+    static let poTokenWaitLimit: TimeInterval = 2
+
+    /// Waits for `task` (the PO token prefetch loadAsync started at `startedAt`) for
+    /// whatever is left of `poTokenWaitLimit`. The prefetch keeps running past the limit.
+    func awaitPoToken(_ task: Task<Void, Never>?, videoId: String, startedAt: Date) async {
+        let remaining = Self.poTokenWaitLimit - Date().timeIntervalSince(startedAt)
+        if let task, remaining > 0 {
+            await withTaskGroup(of: Void.self) { group in
+                group.addTask { await task.value }
+                group.addTask { try? await Task.sleep(for: .seconds(remaining)) }
+                _ = await group.next()
+                group.cancelAll()
+            }
+        }
+        let gotToken = await api.hasPoToken(for: videoId)
+        probeStage("potoken", videoId: videoId, since: startedAt, detail: "waited=\(task != nil) got=\(gotToken)")
+    }
+
     func loadAsync(video: Video) async {
         // Defensive re-establish: guarantees rateObserver is live for every load,
         // even if this view model instance went through suspend() (which
@@ -398,27 +417,18 @@ extension PlaybackViewModel {
         updateNowPlayingInfo()
         #endif
 
-        // Fetch the BotGuard PO token before the primary stream attempt.
-        // Awaited (with a 2 s safety timeout) so api.hasPoToken(for:) returns true during
-        // the rqh=1 adaptive stream check in tryAllStreams — preventing an unnecessary
-        // WKWebView fallback on every cold start.
+        // Fetch the BotGuard PO token concurrently with the primary stream attempt.
+        // Token-free VisionOS HLS never needs it, so only the iOS / fallback paths wait for
+        // it (awaitPoToken, at most poTokenWaitLimit since this point): there it makes
+        // api.hasPoToken(for:) true during the rqh=1 adaptive stream check in tryAllStreams,
+        // preventing an unnecessary WKWebView fallback on every cold start.
         // BotGuardClient completes in <500 ms on first run; cached result returns in <1 ms
-        // thereafter (TTL ~12 h). The 2 s timeout is a safety net for slow networks only.
-        let capturedAPI = api
-        let capturedVideoId = video.id
+        // thereafter (TTL ~12 h).
         let poTokenStart = Date()
-        if !(await api.hasPoToken(for: video.id)) {
-            await withTaskGroup(of: Void.self) { group in
-                group.addTask { await capturedAPI.prefetchPoToken(for: capturedVideoId) }
-                group.addTask { try? await Task.sleep(nanoseconds: 2_000_000_000) }
-                _ = await group.next()
-                group.cancelAll()
-            }
-            let gotToken = await api.hasPoToken(for: video.id)
-            probeStage("potoken", videoId: video.id, since: poTokenStart, detail: "waited=yes got=\(gotToken)")
-        } else {
-            probeStage("potoken", videoId: video.id, since: poTokenStart, detail: "waited=no got=true")
-        }
+        let poTokenTask: Task<Void, Never>? =
+            await api.hasPoToken(for: video.id)
+            ? nil
+            : Task { [api, videoId = video.id] in await api.prefetchPoToken(for: videoId) }
         #if canImport(WebKit)
         // Fire-and-forget: start WKWebView BotGuard pipeline in the background.
         // Takes 3–8 s; by the time the primary attempt fails and exhaustiveRetry runs,
@@ -590,6 +600,7 @@ extension PlaybackViewModel {
         // single-method probe. Without this the cache and the VisionOS-first primary path
         // would usually win before the forced client is ever asked.
         if StreamMethodProbeSupport.forcedStreamMethod != nil {
+            await awaitPoToken(poTokenTask, videoId: video.id, startedAt: poTokenStart)
             await exhaustiveRetry(video: video, originalError: nil)
             return
         }
@@ -649,12 +660,14 @@ extension PlaybackViewModel {
                     "PREFETCH_HIT: playerInfo for \(video.id) — skipping network (hls=\(cachedInfo.hlsURL != nil) dash=\(cachedInfo.dashURL != nil) formats=\(cachedInfo.formats.count))"
                 )
                 probeStage("player", videoId: video.id, since: playerFetchStart, detail: "source=cache")
+                await awaitPoToken(poTokenTask, videoId: video.id, startedAt: poTokenStart)
                 info = cachedInfo
             } else if let inFlight = await VideoPreloadCache.shared.inFlightPlayerFetch(videoId: video.id),
                 let coalescedInfo = await inFlight.value
             {
                 playerLog.notice("PREFETCH_COALESCE: playerInfo for \(video.id) — joined in-flight prefetch task")
                 probeStage("player", videoId: video.id, since: playerFetchStart, detail: "source=coalesced")
+                await awaitPoToken(poTokenTask, videoId: video.id, startedAt: poTokenStart)
                 info = coalescedInfo
             } else if let visionInfo = try? await api.fetchPlayerInfoVisionOS(videoId: video.id),
                 visionInfo.hlsURL != nil
@@ -669,6 +682,7 @@ extension PlaybackViewModel {
                 usedVisionOSPrimary = true
                 info = visionInfo
             } else {
+                await awaitPoToken(poTokenTask, videoId: video.id, startedAt: poTokenStart)
                 do {
                     info = try await api.fetchPlayerInfo(videoId: video.id)
                 } catch {
@@ -818,6 +832,7 @@ extension PlaybackViewModel {
             if usedVisionOSPrimary {
                 if await tryAllStreams(video: video, info: info, label: "VisionOS", skipMuxed: true) { return }
                 playerLog.notice("[VisionOS] primary HLS failed — retrying exhaustively")
+                await awaitPoToken(poTokenTask, videoId: video.id, startedAt: poTokenStart)
                 await exhaustiveRetry(video: video, originalError: nil, playerInfo: info, cached: cached)
                 return
             }
