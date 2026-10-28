@@ -82,3 +82,17 @@ public func parseHLSAudioLanguages(from manifest: String) -> [AudioTrack] {
         return a.name.localizedCompare(b.name) == .orderedAscending
     }
 }
+
+/// The track to start on for a `YT-EXT-AUDIO-CONTENT-ID` manifest: the saved language
+/// when the manifest has it, otherwise the original. Use its `contentID` for the proxy
+/// filter so the stream and the picker agree: when the original carries its own content
+/// ID (`acont=original`), a `nil` filter matches no variant and the proxy serves every
+/// language, letting AVPlayer start on a dub.
+public func initialHLSVariantAudioTrack(in tracks: [AudioTrack], preferred: String?) -> AudioTrack? {
+    if let preferred, preferred != originalAudioLanguageSentinel,
+        let match = tracks.first(where: { $0.languageCode == preferred })
+    {
+        return match
+    }
+    return tracks.first(where: \.isOriginal) ?? tracks.first
+}

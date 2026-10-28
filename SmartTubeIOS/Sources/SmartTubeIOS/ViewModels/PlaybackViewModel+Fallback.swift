@@ -2377,8 +2377,9 @@ extension PlaybackViewModel {
                 // nil means original audio: for real originals that lack the attribute,
                 // contentID is nil on the synthetic "Original" entry; for real originals
                 // with the attribute (e.g. "en-US.4"), contentID equals the real value.
-                // The "Auto" picker row passes track=nil → contentID=nil → original filter.
-                let contentID = track?.contentID
+                // The "Auto" picker row passes track=nil → the original track's contentID.
+                let contentID = (track ?? initialHLSVariantAudioTrack(in: hlsLanguageTracks, preferred: nil))?
+                    .contentID
                 Task { [weak self] in
                     await self?.switchHLSLanguage(
                         to: contentID,
@@ -2402,18 +2403,11 @@ extension PlaybackViewModel {
             playerLog.error("❌ [webView/HLS] failed to build proxy URL for master")
             return false
         }
-        // Determine the initial content ID: if the user has a saved language preference that
-        // matches one of the HLS variant tracks, start with that language; otherwise nil (original).
-        // Use contentID (not id) so the synthetic "Original" entry (id="yt-original-audio",
-        // contentID=nil) correctly maps to nil → proxy keeps no-content-ID variants.
-        let initialContentID: String?
-        if let pref = settings.preferredAudioLanguage,
-            let preferred = hlsLanguageTracks.first(where: { $0.languageCode == pref })
-        {
-            initialContentID = preferred.contentID
-        } else {
-            initialContentID = nil
-        }
+        // Start on the same track AudioTrackManager shows as selected: the saved language,
+        // otherwise the original. Use contentID (not id) so the synthetic "Original" entry
+        // (id="yt-original-audio", contentID=nil) maps to nil → proxy keeps no-content-ID variants.
+        let initialContentID = initialHLSVariantAudioTrack(
+            in: hlsLanguageTracks, preferred: settings.preferredAudioLanguage)?.contentID
         let langDisplay = initialContentID ?? "original"
         // fix20: Use the caller-supplied poToken (captured before wkHLSEarlyTask clears
         // extractedPoToken). With a non-nil poToken the proxy rewrites variant playlist URLs

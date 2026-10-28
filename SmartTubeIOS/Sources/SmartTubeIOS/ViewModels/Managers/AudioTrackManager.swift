@@ -82,16 +82,8 @@ final class AudioTrackManager {
     func loadHLSVariantTracks(_ tracks: [AudioTrack]) {
         guard !tracks.isEmpty else { return }
         availableAudioTracks = tracks
-        let preferred = delegate?.settings.preferredAudioLanguage
-        if let pref = preferred,
-            let preferredTrack = tracks.first(where: { $0.languageCode == pref })
-        {
-            selectedAudioTrack = preferredTrack
-        } else if let originalTrack = tracks.first(where: { $0.isOriginal }) {
-            selectedAudioTrack = originalTrack
-        } else {
-            selectedAudioTrack = tracks.first
-        }
+        selectedAudioTrack = initialHLSVariantAudioTrack(
+            in: tracks, preferred: delegate?.settings.preferredAudioLanguage)
         playerLog.notice(
             "AudioTrackManager: loaded \(tracks.count) HLS variant track(s) — selected: \(selectedAudioTrack?.name ?? "nil")"
         )
