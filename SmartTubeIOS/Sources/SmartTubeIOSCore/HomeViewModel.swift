@@ -62,28 +62,26 @@ public final class HomeViewModel {
         sections.contains { $0.isLoading }
     }
 
+    /// Recommendations placed in `mergedVideos` since the last rebuild. Drives
+    /// where the next subscription slot falls when more recommendations page in.
+    private var interleavedRecCount = 0
+    /// `true` when `mergedVideos` holds subscriptions alone because the
+    /// recommended section came back empty. Subscription pages are then appended
+    /// directly; otherwise they only feed the interleave slots.
+    private var mergedIsSubsOnly = false
+
     /// Rebuilds `mergedVideos` from both sections' current video lists.
     /// Called once after a full load completes so mid-load arrivals never
     /// rearrange already-rendered cards.  Not called during pagination —
     /// `loadMore` appends to `mergedVideos` directly to keep positions stable.
     private func rebuildMergedVideos() {
-        let recState = sections.first { $0.section.type == .home }
-        let subState = sections.first { $0.section.type == .subscriptions }
-        let recs = recState?.videos ?? []
-        let subs = subState?.videos ?? []
+        let recs = sections.first { $0.section.type == .home }?.videos ?? []
+        let subs = sections.first { $0.section.type == .subscriptions }?.videos ?? []
 
-        guard !subs.isEmpty else {
-            var seen = Set<String>()
-            let deduped = recs.filter { seen.insert($0.id).inserted }
-            if deduped.count != recs.count {
-                homeLog.notice(
-                    "rebuildMergedVideos: recs-only dedup removed \(recs.count - deduped.count) duplicate(s) (raw=\(recs.count))"
-                )
-            }
-            mergedVideos = deduped
-            return
-        }
-        guard !recs.isEmpty else {
+        interleavedRecCount = 0
+        mergedVideos = []
+        mergedIsSubsOnly = recs.isEmpty && !subs.isEmpty
+        if mergedIsSubsOnly {
             var seen = Set<String>()
             let deduped = subs.filter { seen.insert($0.id).inserted }
             if deduped.count != subs.count {
@@ -94,36 +92,12 @@ public final class HomeViewModel {
             mergedVideos = deduped
             return
         }
-
-        let recIds = Set(recs.map(\.id))
-        let uniqueSubs = subs.filter { !recIds.contains($0.id) }
-
-        var result: [Video] = []
-        result.reserveCapacity(recs.count + uniqueSubs.count)
-
-        var subIndex = 0
-        for (i, rec) in recs.enumerated() {
-            result.append(rec)
-            let slot = i + 1
-            if slot % Self.interleaveRatio == 0, subIndex < uniqueSubs.count {
-                result.append(uniqueSubs[subIndex])
-                subIndex += 1
-            }
-        }
-        if subIndex < uniqueSubs.count {
-            result.append(contentsOf: uniqueSubs[subIndex...])
-        }
-        // Final safety-net dedup: prevents any remaining duplicate IDs from
-        // reaching ForEach, which would cause SwiftUI to render blank cells.
-        var seen = Set<String>()
-        let deduped = result.filter { seen.insert($0.id).inserted }
-        if deduped.count != result.count {
-            homeLog.notice(
-                "rebuildMergedVideos: final dedup removed \(result.count - deduped.count) duplicate(s) (subs+recs raw=\(result.count))"
-            )
-        }
-        mergedVideos = deduped
+        appendInterleaved(recs: recs)
     }
+
+    /// `loadMoreMerged` skips the subscriptions page while at least this many
+    /// subscription videos still wait for a slot (two recommendation pages' worth).
+    private static let pendingSubsLowWater = 8
 
     /// Non-Short videos from the interleaved home feed.
     /// Used by `homeShelves` to populate the main grid (Shorts are shown separately).
@@ -329,12 +303,17 @@ public final class HomeViewModel {
                 // which breaks the LazyVGrid scroll position (content shifts under the
                 // user's offset, making previously-seen cards reappear and the list
                 // appear to jump back).
-                //
-                // Stable-append to mergedVideos: only add videos not already present,
-                // preserving all existing card positions.
-                let existingMergedIds = Set(mergedVideos.map(\.id))
-                let newForMerged = deduplicated.filter { !existingMergedIds.contains($0.id) }
-                mergedVideos.append(contentsOf: newForMerged)
+
+                // Stable-append to mergedVideos: existing card positions never move.
+                // Recommendations bring their share of pending subscriptions with
+                // them; a subscriptions page only refills that pool, unless the
+                // feed is subscriptions-only.
+                if type == .home {
+                    appendInterleaved(recs: deduplicated)
+                } else if mergedIsSubsOnly {
+                    let existingMergedIds = Set(mergedVideos.map(\.id))
+                    mergedVideos.append(contentsOf: deduplicated.filter { !existingMergedIds.contains($0.id) })
+                }
                 sections[idx].nextPageToken = nextToken
                 sections[idx].isLoadingMore = false
             }
@@ -342,11 +321,18 @@ public final class HomeViewModel {
     }
 
     /// Called by the merged home feed when the user scrolls near the bottom.
-    /// Pages both the recommended and subscriptions sections simultaneously so
-    /// the interleaved list keeps growing evenly.
+    /// Pages the recommended section, and the subscriptions section when its pool
+    /// of not-yet-placed videos runs low, so the interleave keeps its ratio.
     public func loadMoreMerged() {
-        for state in sections where state.section.type == .home || state.section.type == .subscriptions {
-            loadMore(sectionId: state.id)
+        for state in sections {
+            switch state.section.type {
+            case .home:
+                loadMore(sectionId: state.id)
+            case .subscriptions where mergedIsSubsOnly || pendingSubsCount < Self.pendingSubsLowWater:
+                loadMore(sectionId: state.id)
+            default:
+                break
+            }
         }
     }
 
@@ -572,5 +558,41 @@ public final class HomeViewModel {
             homeLog.error("HomeViewModel loadMore \(String(describing: type)): \(error.localizedDescription)")
             return ([], nil)
         }
+    }
+}
+
+// MARK: - Interleave
+
+extension HomeViewModel {
+
+    /// Appends `newRecs` to `mergedVideos`, slotting the next unplaced
+    /// subscription video in after every `interleaveRatio`-th recommendation.
+    /// Subscriptions never trail the feed on their own: once the recommendations
+    /// run out, the remaining ones wait for the next page of recommendations.
+    /// Shorts are skipped here — the grid hides them and they reach the Shorts
+    /// row from the subscriptions section directly (`homeShortsVideos`).
+    fileprivate func appendInterleaved(recs newRecs: [Video]) {
+        var placed = Set(mergedVideos.map(\.id))
+        let allRecIds = Set(sections.first { $0.section.type == .home }?.videos.map(\.id) ?? [])
+        var pendingSubs = (sections.first { $0.section.type == .subscriptions }?.videos ?? [])
+            .filter { !$0.isShort && !placed.contains($0.id) && !allRecIds.contains($0.id) }[...]
+        for rec in newRecs where placed.insert(rec.id).inserted {
+            mergedVideos.append(rec)
+            interleavedRecCount += 1
+            guard interleavedRecCount % Self.interleaveRatio == 0 else { continue }
+            while let sub = pendingSubs.popFirst() {
+                if placed.insert(sub.id).inserted {
+                    mergedVideos.append(sub)
+                    break
+                }
+            }
+        }
+    }
+
+    /// Unplaced, non-Short subscription videos waiting for an interleave slot.
+    fileprivate var pendingSubsCount: Int {
+        let placed = Set(mergedVideos.map(\.id))
+        let subs = sections.first { $0.section.type == .subscriptions }?.videos ?? []
+        return subs.filter { !$0.isShort && !placed.contains($0.id) }.count
     }
 }
