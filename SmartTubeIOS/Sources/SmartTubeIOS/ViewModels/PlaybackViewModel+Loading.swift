@@ -655,7 +655,20 @@ extension PlaybackViewModel {
             // Set when token-free VisionOS HLS is the primary source (see below).
             var usedVisionOSPrimary = false
             let playerFetchStart = Date()
-            if let cachedInfo = cached.playerInfo {
+            if let prefetched = cached.visionOSPlayerInfo {
+                // Card / queue prefetch already holds this video's VisionOS HLS response.
+                playerLog.notice("PREFETCH_HIT: VisionOS playerInfo for \(video.id) — skipping network")
+                probeStage("player", videoId: video.id, since: playerFetchStart, detail: "source=prefetch")
+                usedVisionOSPrimary = true
+                info = prefetched
+            } else if let inFlight = await VideoPreloadCache.shared.inFlightVisionOSFetch(videoId: video.id),
+                let coalesced = await inFlight.value
+            {
+                playerLog.notice("PREFETCH_COALESCE: VisionOS playerInfo for \(video.id) — joined in-flight prefetch")
+                probeStage("player", videoId: video.id, since: playerFetchStart, detail: "source=prefetch-inflight")
+                usedVisionOSPrimary = true
+                info = coalesced
+            } else if let cachedInfo = cached.playerInfo {
                 playerLog.notice(
                     "PREFETCH_HIT: playerInfo for \(video.id) — skipping network (hls=\(cachedInfo.hlsURL != nil) dash=\(cachedInfo.dashURL != nil) formats=\(cachedInfo.formats.count))"
                 )
@@ -675,12 +688,12 @@ extension PlaybackViewModel {
                 // VisionOS first. It returns token-free HLS for most videos, while the iOS
                 // client often returns cipher-only formats and then walks a serial
                 // TV → Android chain (~1.5 s) before exhaustiveRetry reaches VisionOS anyway.
-                // Not stored in VideoPreloadCache: a cache hit replays through the iOS HLS
-                // policy, which lacks VisionOS's H.264 filtering and Safari UA.
+                // Stored as visionOSPlayerInfo so a replay starts from the cache.
                 playerLog.notice("[VisionOS] primary: HLS available — skipping iOS/TV/Android chain")
                 probeStage("player", videoId: video.id, since: playerFetchStart, detail: "source=visionos")
                 usedVisionOSPrimary = true
                 info = visionInfo
+                await VideoPreloadCache.shared.store(visionOSPlayerInfo: visionInfo, for: video.id)
             } else {
                 await awaitPoToken(poTokenTask, videoId: video.id, startedAt: poTokenStart)
                 do {

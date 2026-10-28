@@ -94,6 +94,10 @@ public actor VideoPreloadCache {
     // MARK: - Sub-caches (keyed by videoId)
 
     private var playerInfoCache: [String: CacheEntry<PlayerInfo>] = [:]
+    /// Token-free VisionOS HLS player responses from card / queue prefetch. Kept apart from
+    /// `playerInfoCache` (iOS-client responses from live loads) because the two need
+    /// different playback policies (VisionOS: Safari UA, H.264-filtered master).
+    private var visionOSPlayerInfoCache: [String: CacheEntry<PlayerInfo>] = [:]
     private var trackingCache: [String: CacheEntry<PlaybackTrackingURLs?>] = [:]
     private var nextInfoCache: [String: CacheEntry<NextInfo>] = [:]
     private var endCardsCache: [String: CacheEntry<[EndCard]>] = [:]
@@ -129,6 +133,7 @@ public actor VideoPreloadCache {
     // share a single network request rather than duplicating it.
 
     private var inFlightPlayerFetches: [String: Task<PlayerInfo?, Never>] = [:]
+    private var inFlightVisionOSFetches: [String: Task<PlayerInfo?, Never>] = [:]
 
     // MARK: - Priority queue + worker pool
     //
@@ -249,7 +254,14 @@ public actor VideoPreloadCache {
     // MARK: - Private: worker pool drain
 
     /// Updates the tracked network path and re-evaluates the worker pool.
+    /// Stream URLs are signed for the IP they were fetched from, so a path change after
+    /// the first one (Wi-Fi switch, VPN, cellular handover) drops the cached player responses.
     private func updatePath(_ path: NWPath) {
+        if currentPath != nil, !playerInfoCache.isEmpty || !visionOSPlayerInfoCache.isEmpty {
+            cacheLog.notice("[evict] network path changed — dropping cached player responses")
+            playerInfoCache.removeAll()
+            visionOSPlayerInfoCache.removeAll()
+        }
         currentPath = path
         drainQueue()
     }
@@ -322,6 +334,28 @@ public actor VideoPreloadCache {
         return task
     }
 
+    /// Like `getOrFetchPlayerInfo` for the VisionOS client. Resolves to nil unless the
+    /// response carries an HLS manifest (the only VisionOS stream the player uses).
+    public func getOrFetchVisionOSPlayerInfo(videoId: String) -> Task<PlayerInfo?, Never> {
+        if let existing = inFlightVisionOSFetches[videoId] { return existing }
+        let task = Task<PlayerInfo?, Never>(priority: .userInitiated) {
+            let fetched = try? await self.api.fetchPlayerInfoVisionOS(videoId: videoId)
+            let result = fetched?.hlsURL != nil ? fetched : nil
+            // Store before leaving the in-flight table: a load that arrives while the
+            // prefetch still waits for its other fetches must find one or the other.
+            if let result { self.store(visionOSPlayerInfo: result, for: videoId) }
+            self.inFlightVisionOSFetches.removeValue(forKey: videoId)
+            return result
+        }
+        inFlightVisionOSFetches[videoId] = task
+        return task
+    }
+
+    /// The in-flight VisionOS prefetch for `videoId`, so a live load can join it.
+    public func inFlightVisionOSFetch(videoId: String) -> Task<PlayerInfo?, Never>? {
+        inFlightVisionOSFetches[videoId]
+    }
+
     /// Returns the in-flight player fetch task for `videoId`, or `nil` if none is running.
     /// Used by `loadAsync` to coalesce with a concurrent prefetch without losing error context.
     public func inFlightPlayerFetch(videoId: String) -> Task<PlayerInfo?, Never>? {
@@ -370,6 +404,7 @@ public actor VideoPreloadCache {
         var staleFields = Set<CachedVideoData.DataType>()
         let data = CachedVideoData(
             playerInfo: fresh(playerInfoCache[videoId]),
+            visionOSPlayerInfo: fresh(visionOSPlayerInfoCache[videoId]),
             trackingURLs: trackingCache[videoId].flatMap { $0.isExpired ? nil : $0.value },
             nextInfo: staleOrFresh(nextInfoCache[videoId], dataType: .nextInfo, into: &staleFields),
             endCards: staleOrFresh(endCardsCache[videoId], dataType: .endCards, into: &staleFields),
@@ -378,7 +413,7 @@ public actor VideoPreloadCache {
             staleFields: staleFields
         )
         cacheLog.notice(
-            "[consume] \(videoId, privacy: .public) — player=\(data.playerInfo != nil, privacy: .public) tracking=\(data.trackingURLs != nil, privacy: .public) next=\(data.nextInfo != nil, privacy: .public) endCards=\(data.endCards != nil, privacy: .public) sponsor=\(data.sponsorSegments != nil, privacy: .public) deArrow=\(data.deArrowBranding != nil, privacy: .public) stale=\(staleFields.count, privacy: .public) complete=\(data.isComplete, privacy: .public)"
+            "[consume] \(videoId, privacy: .public) — player=\(data.playerInfo != nil, privacy: .public) visionOS=\(data.visionOSPlayerInfo != nil, privacy: .public) tracking=\(data.trackingURLs != nil, privacy: .public) next=\(data.nextInfo != nil, privacy: .public) endCards=\(data.endCards != nil, privacy: .public) sponsor=\(data.sponsorSegments != nil, privacy: .public) deArrow=\(data.deArrowBranding != nil, privacy: .public) stale=\(staleFields.count, privacy: .public) complete=\(data.isComplete, privacy: .public)"
         )
         return data
     }
@@ -390,6 +425,12 @@ public actor VideoPreloadCache {
             "[store] playerInfo \(videoId, privacy: .public) formats=\(playerInfo.formats.count, privacy: .public) hls=\(playerInfo.hlsURL != nil, privacy: .public) adaptive=\(playerInfo.bestAdaptiveVideoURL != nil, privacy: .public)"
         )
         playerInfoCache[videoId] = CacheEntry(value: playerInfo, storedAt: .init(), ttl: Self.playerInfoTTL)
+        touch(videoId)
+    }
+
+    public func store(visionOSPlayerInfo playerInfo: PlayerInfo, for videoId: String) {
+        cacheLog.notice("[store] visionOSPlayerInfo \(videoId, privacy: .public)")
+        visionOSPlayerInfoCache[videoId] = CacheEntry(value: playerInfo, storedAt: .init(), ttl: Self.playerInfoTTL)
         touch(videoId)
     }
 
@@ -511,9 +552,10 @@ public actor VideoPreloadCache {
     /// Call when a 403 is received for a cached player-info URL.
     /// The cached URL is IP-bound and is now stale; evicting forces a fresh fetch on next load.
     public func invalidatePlayerInfo(for videoId: String) {
-        guard playerInfoCache[videoId] != nil else { return }
+        guard playerInfoCache[videoId] != nil || visionOSPlayerInfoCache[videoId] != nil else { return }
         cacheLog.notice("[evict] 403 — invalidating playerInfoCache for \(videoId, privacy: .public)")
         playerInfoCache.removeValue(forKey: videoId)
+        visionOSPlayerInfoCache.removeValue(forKey: videoId)
     }
 
     /// Call when the cached WKWebView HLS URL returns 403 (expired signed URL).
@@ -541,9 +583,11 @@ public actor VideoPreloadCache {
             "[prefetch] START \(videoId, privacy: .public) allowed=\(allowed.sorted().joined(separator: ","), privacy: .public)"
         )
 
-        // Route through getOrFetchPlayerInfo so a concurrent live-load for the
-        // same video reuses this in-flight task instead of issuing a second request.
-        let playerFetchTask = getOrFetchPlayerInfo(videoId: videoId)
+        // VisionOS, like the live load: its token-free HLS is what the player starts with,
+        // while the iOS client mostly returns cipher-only formats that cannot be cached.
+        // Routed through getOrFetchVisionOSPlayerInfo so a live load for the same video
+        // joins this in-flight request instead of issuing a second one.
+        let playerFetchTask = getOrFetchVisionOSPlayerInfo(videoId: videoId)
         // Gate optional fetches on the current network path (Phase K).
         async let nextResult = allowed.contains("nextInfo") ? (try? await api.fetchNextInfo(videoId: videoId)) : nil
         async let endCardsResult = allowed.contains("endCards") ? (try? await api.fetchEndCards(videoId: videoId)) : nil
@@ -556,7 +600,7 @@ public actor VideoPreloadCache {
         // This runs concurrently with the 5 child tasks above (all are in flight by this point).
         //
         // Tracking URLs: prefer the `playbackTracking` URLs from the iOS-client player
-        // response (which `getOrFetchPlayerInfo` already obtained) over a separate dedicated
+        // response (which `getOrFetchVisionOSPlayerInfo` already obtained) over a separate dedicated
         // fetch. The previous approach (a separate `fetchAuthenticatedTrackingURLs` call hitting
         // a separate endpoint) failed for device-code-signed-in users because YouTube's web
         // client rejects the TV device-code Bearer with HTTP 400, and the cookie-exchange paths
@@ -578,7 +622,6 @@ public actor VideoPreloadCache {
 
         let elapsed = String(format: "%.2fs", Date().timeIntervalSince(startedAt))
 
-        if let player { store(playerInfo: player, for: videoId) }
         let tracking: PlaybackTrackingURLs? = player?.trackingURLs
         store(trackingURLs: tracking, for: videoId)
         if let next { store(nextInfo: next, for: videoId) }
@@ -603,6 +646,7 @@ public actor VideoPreloadCache {
                 "[lru] EVICT \(evict, privacy: .public) — cache full (\(Self.maxVideoEntries, privacy: .public) entries)"
             )
             playerInfoCache.removeValue(forKey: evict)
+            visionOSPlayerInfoCache.removeValue(forKey: evict)
             trackingCache.removeValue(forKey: evict)
             nextInfoCache.removeValue(forKey: evict)
             endCardsCache.removeValue(forKey: evict)
@@ -646,6 +690,8 @@ public struct CachedVideoData: Sendable {
     }
 
     public let playerInfo: PlayerInfo?
+    /// VisionOS HLS response from prefetch; play it with the VisionOS policy.
+    public let visionOSPlayerInfo: PlayerInfo?
     public let trackingURLs: PlaybackTrackingURLs??  // outer nil = not cached, inner nil = cached as "no URLs"
     public let nextInfo: NextInfo?
     public let endCards: [EndCard]?
@@ -657,11 +703,12 @@ public struct CachedVideoData: Sendable {
 
     /// True when every field that is required for instant playback start is fresh.
     public var isComplete: Bool {
-        playerInfo != nil && nextInfo != nil && sponsorSegments != nil
+        (playerInfo != nil || visionOSPlayerInfo != nil) && nextInfo != nil && sponsorSegments != nil
     }
 
     public init(
         playerInfo: PlayerInfo?,
+        visionOSPlayerInfo: PlayerInfo? = nil,
         trackingURLs: PlaybackTrackingURLs??,
         nextInfo: NextInfo?,
         endCards: [EndCard]?,
@@ -670,6 +717,7 @@ public struct CachedVideoData: Sendable {
         staleFields: Set<DataType>
     ) {
         self.playerInfo = playerInfo
+        self.visionOSPlayerInfo = visionOSPlayerInfo
         self.trackingURLs = trackingURLs
         self.nextInfo = nextInfo
         self.endCards = endCards
