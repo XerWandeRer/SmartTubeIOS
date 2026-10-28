@@ -27,6 +27,7 @@ DU_LIMIT_KB=$((5 * 1024 * 1024))
 LOG_PREDICATE='subsystem == "com.xerwanderer.mytube" OR subsystem == "com.void.smarttube.app"'
 DEVICES_DIR=$HOME/Library/Developer/CoreSimulator/Devices
 typeset -a EXTRA_ARGS   # extra launch arguments for probe_one
+WARM_SECS=0             # probe_one: >0 = launch idle, wait, then open the video by URL
 
 mkdir -p $OUT
 
@@ -250,7 +251,26 @@ await_probe() {
 
 field() { print -r -- "$1" | grep -oE "(^| )$2=[^ ]*" | head -1 | sed -E "s/^ ?$2=//" }
 
-# Cold-launches one video on worker $w and records the outcome.
+# Taps "Open" on the "Open in “SmartTube”?" prompt that `simctl openurl` raises.
+tap_open_prompt() {
+  local w=$1 i xy
+  for i in {1..40}; do
+    xy=$(idb ui describe-all --udid $w --json 2>/dev/null | python3 -I -c '
+import json, sys
+for e in json.load(sys.stdin):
+    if e.get("type") == "Button" and e.get("AXLabel") == "Open":
+        f = e["frame"]
+        print(int(f["x"] + f["width"] / 2), int(f["y"] + f["height"] / 2))
+        break' 2>/dev/null)
+    [[ -n $xy ]] && { idb ui tap ${=xy} --udid $w >/dev/null; return 0 }
+    sleep 0.25
+  done
+  return 1
+}
+
+# Cold-launches one video on worker $w and records the outcome. With WARM_SECS > 0 the
+# app launches to Home, idles WARM_SECS (feed, prefetch, launch-time warm-ups), and the
+# video then opens through its URL — the usual "app open, tap a video" case.
 # probe_one <worker> <case> <videoId> <client|""> <timeout> → prints a TSV row.
 probe_one() {
   local w=$1 name=$2 vid=$3 client=$4 timeout=$5
@@ -262,7 +282,16 @@ probe_one() {
   xcrun simctl spawn $w log stream --level debug --style compact --predicate "$LOG_PREDICATE" > $tag.log 2>&1 &
   local lpid=$!
   sleep 1
-  xcrun simctl launch $w $BUNDLE "${args[@]}" >/dev/null
+  if ((WARM_SECS > 0)); then
+    xcrun simctl launch $w $BUNDLE "${EXTRA_ARGS[@]}" >/dev/null
+    sleep $WARM_SECS
+    xcrun simctl openurl $w "smarttube://video/$vid" &
+    local upid=$!
+    tap_open_prompt $w || note "no Open prompt for $vid"
+    wait $upid 2>/dev/null
+  else
+    xcrun simctl launch $w $BUNDLE "${args[@]}" >/dev/null
+  fi
   local res=$(await_probe $tag.log $vid $timeout)
   [[ $res == ready* ]] && sleep 4   # let the first frames render before the screenshot
   xcrun simctl io $w screenshot $tag.png >/dev/null 2>&1
@@ -335,9 +364,10 @@ cmd_regress() {
   ((fail == 0))
 }
 
-# bench [--list tsv] [--rounds n] [--timeout s] — startup timing per step. Every round
-# cold-launches each video of the list on one worker (round 1 is the app's first launch),
-# then summarises the PlaybackProbe stage records with bench-stages.py.
+# bench [--list tsv] [--rounds n] [--timeout s] [--warm secs] — startup timing per step.
+# Every round launches the app afresh for each video of the list on one worker (round 1
+# is the app's first launch): by deep link (cold), or with --warm idle on Home first and
+# then by URL. Summarises the PlaybackProbe stage records with bench-stages.py.
 cmd_bench() {
   local timeout=60 list=${MYTUBE_BENCH_LIST:-$SRC/scripts/mytube/bench-list.tsv} rounds=3
   while (($#)); do
@@ -345,6 +375,7 @@ cmd_bench() {
       --list) list=$2; shift 2 ;;
       --rounds) rounds=$2; shift 2 ;;
       --timeout) timeout=$2; shift 2 ;;
+      --warm) WARM_SECS=$2; shift 2 ;;
       *) die "unknown option $1" ;;
     esac
   done
@@ -354,7 +385,9 @@ cmd_bench() {
   w=$(worker_up) || exit 1
   trap worker_down EXIT
   xcrun simctl install $w $APP || die "install failed"
-  local report=$OUT/bench-$(date +%Y%m%d-%H%M%S).tsv r name vid
+  local mode=cold
+  ((WARM_SECS > 0)) && mode=warm$WARM_SECS
+  local report=$OUT/bench-$mode-$(date +%Y%m%d-%H%M%S).tsv r name vid
   python3 -I $SRC/scripts/mytube/bench-stages.py --header > $report
   for r in $(seq 1 $rounds); do
     while IFS=$'\t' read -r name vid; do
@@ -449,7 +482,7 @@ usage: mytube-sim.sh <command>
   play <id> [--client m] [--timeout s]     one probe on a throwaway worker
   regress [--client m] [--list f] [--timeout s]   run the regression list, print table
   fixtures [--clients "m …"] [--list f]   record scrubbed /player responses per client
-  bench [--list f] [--rounds n]            startup timing per step (cold launches)
+  bench [--list f] [--rounds n] [--warm s] startup timing per step (cold or warm launches)
   unit [Suite[/test]]        package unit tests on a throwaway worker
   status | reset
 client methods: ios ios-auth tvembedded tvauth websafari mweb android android-vr visionos
