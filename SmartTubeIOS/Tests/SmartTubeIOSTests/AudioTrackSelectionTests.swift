@@ -14,42 +14,14 @@ struct AudioTrackSelectionTests {
         AudioTrack(id: code, name: code, languageCode: code, isOriginal: isOriginal)
     }
 
-    /// Simulates the auto-selection waterfall from PlaybackViewModel+AudioTracks
-    /// without an AVPlayer. Mirrors the exact logic in loadAudioTracks(from:).
-    /// Pass `deviceLanguages` to simulate Locale.preferredLanguages (defaults to empty).
+    /// Runs the production waterfall. Pass `deviceLanguages` to simulate
+    /// Locale.preferredLanguages (defaults to empty).
     private func autoSelect(
         tracks: [AudioTrack],
         preferred: String?,
         deviceLanguages: [String] = []
     ) -> AudioTrack? {
-        // 1. Saved preference / Settings-level independent language choice
-        if let lang = preferred {
-            if lang == "original" {
-                return tracks.first(where: \.isOriginal) ?? tracks.first
-            }
-            if let exact = tracks.first(where: { $0.languageCode == lang }) { return exact }
-            let base = lang.components(separatedBy: "-").first ?? lang
-            return tracks.first(where: { $0.languageCode.hasPrefix(base) })
-                ?? tracks.first(where: \.isOriginal)
-        }
-        // 2. Device preferred languages — before DEFAULT=YES to avoid dubbed tracks
-        //    overriding the user's expected language (issue #54 regression fix).
-        for deviceLang in deviceLanguages {
-            if let exact = tracks.first(where: { $0.languageCode == deviceLang }) { return exact }
-            let base = deviceLang.components(separatedBy: "-").first ?? deviceLang
-            if let match = tracks.first(where: { $0.languageCode.hasPrefix(base) }) { return match }
-        }
-        // 3. HLS DEFAULT=YES original
-        if let original = tracks.first(where: \.isOriginal) { return original }
-        // 4. English track
-        let englishPrefixes = ["en-", "en_"]
-        if let english = tracks.first(where: { $0.languageCode == "en" })
-            ?? tracks.first(where: { lang in englishPrefixes.contains(where: { lang.languageCode.hasPrefix($0) }) })
-        {
-            return english
-        }
-        // 5. First track
-        return tracks.first
+        autoSelectAudioTrack(from: tracks, preferred: preferred, deviceLanguages: deviceLanguages)
     }
 
     // MARK: - Tests

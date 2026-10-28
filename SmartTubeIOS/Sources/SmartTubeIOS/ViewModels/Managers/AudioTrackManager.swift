@@ -241,33 +241,10 @@ final class AudioTrackManager {
 
             self.availableAudioTracks = tracks
 
-            let preferred = self.delegate?.settings.preferredAudioLanguage
-            let autoSelect: AudioTrack? = {
-                if let lang = preferred {
-                    if lang == "original" {
-                        return tracks.first(where: \.isOriginal) ?? tracks.first
-                    }
-                    if let exact = tracks.first(where: { $0.languageCode == lang }) { return exact }
-                    let base = lang.components(separatedBy: "-").first ?? lang
-                    return tracks.first(where: { $0.languageCode.hasPrefix(base) })
-                        ?? tracks.first(where: \.isOriginal)
-                }
-                for deviceLang in Locale.preferredLanguages {
-                    if let exact = tracks.first(where: { $0.languageCode == deviceLang }) { return exact }
-                    let base = deviceLang.components(separatedBy: "-").first ?? deviceLang
-                    if let match = tracks.first(where: { $0.languageCode.hasPrefix(base) }) { return match }
-                }
-                if let original = tracks.first(where: \.isOriginal) { return original }
-                let englishPrefixes = ["en-", "en_"]
-                if let english = tracks.first(where: { $0.languageCode == "en" })
-                    ?? tracks.first(where: { lang in
-                        englishPrefixes.contains(where: { lang.languageCode.hasPrefix($0) })
-                    })
-                {
-                    return english
-                }
-                return tracks.first
-            }()
+            let autoSelect = autoSelectAudioTrack(
+                from: tracks,
+                preferred: self.delegate?.settings.preferredAudioLanguage,
+                deviceLanguages: Locale.preferredLanguages)
             self.selectedAudioTrack = autoSelect
             if let autoSelect, let option = optionMap[autoSelect.id] {
                 item.select(option, in: group)
