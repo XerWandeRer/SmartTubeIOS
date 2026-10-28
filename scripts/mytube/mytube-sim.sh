@@ -3,7 +3,7 @@
 # Installed on the build Mac as ~/Developer/MyTube/mytube-sim.sh. Run without args for usage.
 #
 # Simulators: "MyTube-Golden" holds the signed-in state and is never used for tests.
-# Tests run on a throwaway clone "MyTube-Work-<ts>". At most one clone exists at a time.
+# Tests run on a throwaway clone "MyTube-Work-<ts>". At most one clone per worker prefix.
 # `play` and `regress` delete their clone on exit; `up` keeps one alive for the
 # step-by-step commands (open/logs/shot/record/ui) until `down` or `reset`.
 set -o pipefail
@@ -12,11 +12,13 @@ export PATH=/opt/homebrew/bin:$HOME/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin
 ROOT=$HOME/Developer/MyTube
 SRC=${MYTUBE_SRC:-$ROOT/SmartTubeIOS}
 DD=${MYTUBE_DD:-$ROOT/DD-sim}
-OUT=$ROOT/sim-out
+OUT=${MYTUBE_OUT:-$ROOT/sim-out}
 APP=$DD/Build/Products/Debug-iphonesimulator/SmartTube.app
 BUNDLE=com.xerwanderer.mytube
 GOLDEN=MyTube-Golden
-WORKER_PREFIX=MyTube-Work
+# Parallel sessions: give each its own MYTUBE_WORKER_PREFIX (e.g. MyTube-WkA, not a
+# prefix of another session's), MYTUBE_OUT, MYTUBE_SRC and MYTUBE_DD. At most 3 at once.
+WORKER_PREFIX=${MYTUBE_WORKER_PREFIX:-MyTube-Work}
 RUNTIME=${MYTUBE_RUNTIME:-com.apple.CoreSimulator.SimRuntime.iOS-27-0}   # matches the iPhone (iOS 27.0.x)
 DEVTYPE="iPhone Air"
 YTDLP=$ROOT/yt-dlp-nightly
@@ -411,7 +413,7 @@ cmd_unit() {
   w=$(worker_up) || exit 1
   trap worker_down EXIT
   (cd $SRC/SmartTubeIOS && xcodebuild test -scheme SmartTubeIOS-Package -destination "id=$w" \
-    -derivedDataPath $ROOT/DD-unit CODE_SIGNING_ALLOWED=NO $only) > $log 2>&1
+    -derivedDataPath ${MYTUBE_DD_UNIT:-$ROOT/DD-unit} CODE_SIGNING_ALLOWED=NO $only) > $log 2>&1
   local rc=$?
   grep -E "error:|✘|Test run with|\*\* TEST" $log | tail -40
   print "UNIT_EXIT=$rc (log: $log)"
