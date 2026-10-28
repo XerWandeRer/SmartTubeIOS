@@ -95,6 +95,11 @@ extension PlaybackViewModel {
             await probeStreamMethod(method, video: video)
             return
         }
+        #if canImport(WebKit)
+        // Start the WKWebView warm-ups now (not at tap time) so they overlap the VisionOS
+        // retry below and are in flight when Phase -1a and the race paths need them.
+        startWebViewFallbackWarmups(videoId: video.id)
+        #endif
         // Current yt-dlp uses VISIONOS as its primary JS-less Apple client. After
         // seeding a normal YouTube webpage session it returns token-free HLS with
         // H.264 through 1080p, which AVPlayer handles natively.
@@ -124,8 +129,8 @@ extension PlaybackViewModel {
         //
         // Note: for preWarm origin + pot=nil videos (e.g. uN7uKLsGRWw), tryWebViewHLS will
         // fail (~1.32 s) because pfa/1 variant playlist segments need pot= or a warm CDN
-        // session. However, this failure is USEFUL: it gives wkHLSEarlyTask (launched by
-        // loadAsync concurrently) ~1.78 s of head start so Path B wins immediately after
+        // session. However, this failure is USEFUL: it gives wkHLSEarlyTask (launched on
+        // exhaustiveRetry entry) ~1.78 s of head start so Path B wins immediately after
         // Phase -1a fails. Do NOT skip Phase -1a for preWarm+pot=nil — doing so removes the
         // concurrent overlap and forces Path B to wait the full ~2.17 s alone, costing ~0.6 s.
         if let cachedHLSURL = await VideoPreloadCache.shared.cachedWKHLSURL(for: video.id) {
@@ -194,8 +199,8 @@ extension PlaybackViewModel {
         //   <5 ms if already warm), probes CDN, tries WEB adaptive / proxy HLS / iOS+Android
         //   adaptive. Fast for videos where the CDN accepts the minted token (~1–2 s).
         //
-        // Path B — WKWebView HLS: awaits `wkHLSEarlyTask` (started in loadAsync, already
-        //   in-flight). Bypasses the 6 s BotGuard wait on cold starts. Fast for rqh=1 videos
+        // Path B — WKWebView HLS: awaits `wkHLSEarlyTask` (started on exhaustiveRetry
+        //   entry, already in-flight). Bypasses the 6 s BotGuard wait on cold starts. Fast for rqh=1 videos
         //   where the CDN probe returns 403 (~3–4 s from loadAsync start).
         //
         // Path C — AndroidVR adaptive: fetches playerInfo via the ANDROID_VR (Oculus Quest)
@@ -730,7 +735,7 @@ extension PlaybackViewModel {
     #endif  // canImport(WebKit)
 
     /// Path B of the exhaustiveRetry race: early WKWebView HLS path.
-    /// Awaits the `wkHLSEarlyTask` started in `loadAsync` (already in-flight).
+    /// Awaits the `wkHLSEarlyTask` started on `exhaustiveRetry` entry (already in-flight).
     /// Returns `true` if a stream reached `readyToPlay`.
     #if canImport(WebKit)
     func racePathB(video: Video) async -> Bool {

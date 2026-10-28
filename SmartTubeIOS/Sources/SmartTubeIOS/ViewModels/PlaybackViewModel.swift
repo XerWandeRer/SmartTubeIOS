@@ -399,14 +399,12 @@ public final class PlaybackViewModel {
     /// or pre-warms AVAssetTrack arrays for the user's preferred quality tier.
     /// Cancelled on every new video load.
     var prefetchTask: Task<Void, Never>?
-    /// Early WKWebView HLS extraction task, started concurrently with the primary iOS
-    /// path in loadAsync() so the result is ready (or close to ready) by the time
-    /// exhaustiveRetry reaches Phase -2. Cancelled by load() only when a different
-    /// video is requested; preserved across stop() so same-video replay can reuse it.
+    /// WKWebView HLS extraction task, started on exhaustiveRetry entry
+    /// (`startWebViewFallbackWarmups`) so the result is ready (or close to ready) by the
+    /// time race Path B awaits it. Cancelled by every load().
     #if canImport(WebKit)
     var wkHLSEarlyTask: Task<URL?, Never>?
     /// The videoId for which `wkHLSEarlyTask` was last started.
-    /// Allows load() to skip cancellation when the same video is re-tapped after stop().
     var wkHLSEarlyTaskVideoId: String?
     #endif
     /// fix2/fix30: TVEmbedded PlayerInfo pre-fetch started concurrently with the race paths.
