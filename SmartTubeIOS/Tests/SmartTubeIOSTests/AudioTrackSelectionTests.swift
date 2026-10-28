@@ -71,6 +71,26 @@ struct AudioTrackSelectionTests {
 
     // MARK: - Task #19: "original" sentinel and independent language setting
 
+    /// Picking the creator's original saves the sentinel, so the next video with a dub in
+    /// that language still opens on its own original (XER-18).
+    @Test func pickingOriginalTrack_savesOriginalSentinel() {
+        #expect(preferredAudioLanguage(forPicked: track("zh-Hant", isOriginal: true)) == "original")
+    }
+
+    /// Picking a dub saves its language; the "Auto" row clears the preference.
+    @Test func pickingDubOrAuto_savesLanguageOrClears() {
+        #expect(preferredAudioLanguage(forPicked: track("en-US")) == "en-US")
+        #expect(preferredAudioLanguage(forPicked: nil) == nil)
+    }
+
+    /// After picking the original of a Chinese video, an English video with a Chinese dub
+    /// opens on its English original.
+    @Test func savedOriginalSentinel_picksNextVideosOriginal() {
+        let saved = preferredAudioLanguage(forPicked: track("zh-Hant", isOriginal: true))
+        let nextVideo = [track("zh-Hant"), track("en-US", isOriginal: true)]
+        #expect(autoSelect(tracks: nextVideo, preferred: saved)?.languageCode == "en-US")
+    }
+
     /// When preferredAudioLanguage == "original", the HLS DEFAULT=YES track is selected.
     @Test func originalSentinel_selectsHLSDefaultTrack() {
         let tracks = [

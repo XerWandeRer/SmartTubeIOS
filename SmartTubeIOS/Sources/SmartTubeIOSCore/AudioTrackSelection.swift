@@ -46,3 +46,12 @@ public func autoSelectAudioTrack(
     }
     return tracks.first
 }
+
+/// The `preferredAudioLanguage` to save when the user picks `track` in the player.
+/// Picking the creator's original saves the "original" sentinel, not its language, so
+/// the next video also opens on its own original instead of a dub in that language.
+/// `nil` (the "Auto" row) clears the preference.
+public func preferredAudioLanguage(forPicked track: AudioTrack?) -> String? {
+    guard let track else { return nil }
+    return track.isOriginal ? originalAudioLanguageSentinel : track.languageCode
+}
