@@ -1037,6 +1037,27 @@ extension PlaybackViewModel {
 
     // MARK: - Attempt Helpers
 
+    /// Applies parsed HLS master variants to the quality state: caps them at the client's
+    /// maximum height, stores them in `hlsVariantURLs` and limits the picker to the heights
+    /// the master offers. Returns the capped variants (unchanged state when empty).
+    @discardableResult
+    private func applyHLSVariants(
+        _ allVariantURLs: [Int: URL], policy: HLSPlaybackPolicy, label: String
+    ) -> [Int: URL] {
+        let variantURLs =
+            policy.maximumHeight.map { cap in
+                allVariantURLs.filter { $0.key <= cap }
+            } ?? allVariantURLs
+        playerLog.notice(
+            "[\(label)] HLS: variantCount=\(variantURLs.count) heights=\(variantURLs.keys.sorted(by: >)) effectiveQuality=\(effectiveQuality)"
+        )
+        if !variantURLs.isEmpty {
+            hlsVariantURLs = variantURLs
+            availableFormats = availableFormats.filter { variantURLs.keys.contains($0.height) }
+        }
+        return variantURLs
+    }
+
     /// Tries a single URL in AVPlayer. Returns true if `.readyToPlay` is received.
     /// `statusStream` finishes after `.readyToPlay` or `.failed`, making it safe to await inline.
     private func attemptURL(_ url: URL, for video: Video, info: PlayerInfo, label: String) async -> Bool {
@@ -1066,76 +1087,79 @@ extension PlaybackViewModel {
 
         var effectiveURL = url
         var applyHLSHints = false
+        var manifestVariantsHandler: (@MainActor @Sendable ([Int: URL]) -> Void)?
         if let hlsURL = info.hlsURL, url == hlsURL {
             let videoId = video.id
-            let allVariantURLs: [Int: URL]
-            let masterFetchStart = Date()
-            if hlsPolicy.filtersMasterManifest {
-                let fetched = await qualityManager.fetchHLSVariantURLs(
-                    url: hlsURL, userAgent: hlsPolicy.userAgent
-                )
-                if fetched.isEmpty,
-                    let cached = PlaybackQualityManager.cachedHLSVariants(for: videoId)
-                {
-                    allVariantURLs = cached
-                } else {
-                    allVariantURLs = fetched
-                }
-                if !fetched.isEmpty {
-                    PlaybackQualityManager.cacheHLSVariants(fetched, for: videoId)
-                }
-            } else if let cached = PlaybackQualityManager.cachedHLSVariants(for: videoId) {
-                playerLog.notice("[\(label)] HLS: using cached manifest for \(videoId) variantCount=\(cached.count)")
-                allVariantURLs = cached
-            } else {
-                let fetched = await fetchHLSVariantURLs(url: hlsURL)
-                allVariantURLs = fetched
-                if !fetched.isEmpty {
-                    PlaybackQualityManager.cacheHLSVariants(fetched, for: videoId)
-                }
-            }
-            probeStage(
-                "master_parse", videoId: videoId, since: masterFetchStart,
-                detail: "label=\(label) variants=\(allVariantURLs.count)")
-            let variantURLs =
-                hlsPolicy.maximumHeight.map { cap in
-                    allVariantURLs.filter { $0.key <= cap }
-                } ?? allVariantURLs
-            playerLog.notice(
-                "[\(label)] HLS: hlsURL=yes variantCount=\(variantURLs.count) effectiveQuality=\(effectiveQuality)")
             if hlsPolicy.requiresH264 {
                 availableFormats = availableFormats.filter { format in
                     hlsPolicy.allowsFormat(height: format.height, mimeType: format.mimeType)
                 }
             }
-            if !variantURLs.isEmpty {
-                hlsVariantURLs = variantURLs
-                let playableFormats = availableFormats.filter { variantURLs.keys.contains($0.height) }
-                availableFormats = playableFormats
-                // Use a variant playlist URL directly rather than the master manifest URL.
-                // The master manifest (hls_variant) stalls AVPlayer on manifest.googlevideo.com
-                // because it requires session-level auth that AVPlayer's isolated network stack
-                // cannot provide. Variant playlist URLs (hls_playlist) are directly downloadable
-                // — yt-dlp confirms 720p in 13 s, 1080p in 29 s for the same video.
-                // Per-video pick (when set) takes precedence over the persisted default —
-                // a mid-playback 403 recovery must not silently revert the user's choice.
-                let preferredMaxH = hlsPolicy.cappedHeight(requested: effectiveQuality.maxHeight)
-                let chosen =
-                    preferredMaxH
-                    .flatMap { h in variantURLs.filter { $0.key <= h }.max(by: { $0.key < $1.key }) }
-                    ?? variantURLs.max(by: { $0.key < $1.key })
-                if let chosen {
-                    if hlsPolicy.filtersMasterManifest {
-                        effectiveURL = hlsURL
-                        playerLog.notice(
-                            "[\(label)] HLS: using H.264-filtered master with \(chosen.key)p cap and audio renditions")
-                    } else {
+            if hlsPolicy.filtersMasterManifest {
+                // AVPlayer gets the master through the filtering proxy, which already reads it.
+                // Take the variant heights (quality picker, hlsVariantURLs) from that response
+                // instead of fetching the master again before the item can be created; the
+                // initial quality cap comes from ABR hints and does not need the variants.
+                effectiveURL = hlsURL
+                if let cached = PlaybackQualityManager.cachedHLSVariants(for: videoId) {
+                    playerLog.notice(
+                        "[\(label)] HLS: using cached manifest for \(videoId) variantCount=\(cached.count)")
+                    applyHLSVariants(cached, policy: hlsPolicy, label: label)
+                }
+                let handlerStart = Date()
+                manifestVariantsHandler = { [weak self] fetched in
+                    guard let self, self.currentVideo?.id == videoId, self.playerInfo?.hlsURL == hlsURL else { return }
+                    self.probeStage(
+                        "master_variants", videoId: videoId, since: handlerStart,
+                        detail: "label=\(label) variants=\(fetched.count) source=proxy")
+                    guard !fetched.isEmpty else {
+                        playerLog.notice("[\(label)] HLS master from proxy has 0 variants — picker unchanged")
+                        return
+                    }
+                    PlaybackQualityManager.cacheHLSVariants(fetched, for: videoId)
+                    self.applyHLSVariants(fetched, policy: hlsPolicy, label: label)
+                    self.qualityManager.setSelectedFormatForCurrentPreference()
+                }
+                playerLog.notice(
+                    "[\(label)] HLS: using H.264-filtered master and audio renditions; variants come from the proxy")
+            } else {
+                let allVariantURLs: [Int: URL]
+                let manifestFetchStart = Date()
+                if let cached = PlaybackQualityManager.cachedHLSVariants(for: videoId) {
+                    playerLog.notice(
+                        "[\(label)] HLS: using cached manifest for \(videoId) variantCount=\(cached.count)")
+                    allVariantURLs = cached
+                } else {
+                    let fetched = await fetchHLSVariantURLs(url: hlsURL)
+                    allVariantURLs = fetched
+                    if !fetched.isEmpty {
+                        PlaybackQualityManager.cacheHLSVariants(fetched, for: videoId)
+                    }
+                }
+                probeStage(
+                    "master_parse", videoId: videoId, since: manifestFetchStart,
+                    detail: "label=\(label) variants=\(allVariantURLs.count)")
+                let variantURLs = applyHLSVariants(allVariantURLs, policy: hlsPolicy, label: label)
+                if !variantURLs.isEmpty {
+                    // Use a variant playlist URL directly rather than the master manifest URL.
+                    // The master manifest (hls_variant) stalls AVPlayer on manifest.googlevideo.com
+                    // because it requires session-level auth that AVPlayer's isolated network stack
+                    // cannot provide. Variant playlist URLs (hls_playlist) are directly downloadable
+                    // — yt-dlp confirms 720p in 13 s, 1080p in 29 s for the same video.
+                    // Per-video pick (when set) takes precedence over the persisted default —
+                    // a mid-playback 403 recovery must not silently revert the user's choice.
+                    let preferredMaxH = hlsPolicy.cappedHeight(requested: effectiveQuality.maxHeight)
+                    let chosen =
+                        preferredMaxH
+                        .flatMap { h in variantURLs.filter { $0.key <= h }.max(by: { $0.key < $1.key }) }
+                        ?? variantURLs.max(by: { $0.key < $1.key })
+                    if let chosen {
                         effectiveURL = chosen.value
                         playerLog.notice("[\(label)] HLS: selected variant \(chosen.key)p")
                     }
+                } else {
+                    playerLog.notice("[\(label)] HLS manifest fetch returned 0 variants — using master as-is")
                 }
-            } else {
-                playerLog.notice("[\(label)] HLS manifest fetch returned 0 variants — using master as-is")
             }
             qualityManager.configureHLSPlayback(
                 userAgent: hlsPolicy.userAgent,
@@ -1168,7 +1192,8 @@ extension PlaybackViewModel {
             // no HTTP protocol handler, so segment sub-requests inside HLS always
             // fail regardless of the io_open callback approach.
             let uaOpts: [String: Any] = ["AVURLAssetHTTPHeaderFieldsKey": hlsHeaders]
-            let asset = qualityManager.makeHLSAsset(url: effectiveURL, options: uaOpts)
+            let asset = qualityManager.makeHLSAsset(
+                url: effectiveURL, options: uaOpts, onManifestVariants: manifestVariantsHandler)
             playerLog.notice("[\(label)] HLS via AVURLAsset (native stack) url=\(effectiveURL.lastPathComponent)")
             item = AVPlayerItem(asset: asset)
         } else {

@@ -324,7 +324,14 @@ final class PlaybackQualityManager {
         nativeHLSProxyLoader = nil
     }
 
-    func makeHLSAsset(url: URL, options: [String: Any]) -> AVURLAsset {
+    /// Builds the HLS asset, routed through the filtering proxy when the client needs it.
+    /// `onManifestVariants` runs on the main actor with the variants parsed from the master
+    /// manifest the proxy serves to AVPlayer (proxied assets only).
+    func makeHLSAsset(
+        url: URL,
+        options: [String: Any],
+        onManifestVariants: (@MainActor @Sendable ([Int: URL]) -> Void)? = nil
+    ) -> AVURLAsset {
         guard let requiredVideoCodec = hlsRequiredVideoCodec,
             let maximumVideoHeight = hlsPlaybackMaximumHeight,
             let proxyURL = url.proxyURL
@@ -332,10 +339,17 @@ final class PlaybackQualityManager {
             nativeHLSProxyLoader = nil
             return AVURLAsset(url: url, options: options)
         }
+        var forwardVariants: (@Sendable ([Int: URL]) -> Void)?
+        if let onManifestVariants {
+            forwardVariants = { variants in
+                Task { @MainActor in onManifestVariants(variants) }
+            }
+        }
         let loader = YTHLSProxyLoader(
             ua: hlsPlaybackUserAgent,
             maximumVideoHeight: maximumVideoHeight,
-            requiredVideoCodec: requiredVideoCodec
+            requiredVideoCodec: requiredVideoCodec,
+            onManifestVariants: forwardVariants
         )
         let asset = AVURLAsset(url: proxyURL, options: options)
         asset.resourceLoader.setDelegate(loader, queue: .global(qos: .userInitiated))

@@ -66,6 +66,10 @@ final class YTHLSProxyLoader: NSObject, AVAssetResourceLoaderDelegate, @unchecke
     /// Optional compatibility filter applied to master manifests before URI rewriting.
     let maximumVideoHeight: Int?
     let requiredVideoCodec: String?
+    /// Receives the variants parsed from each unfiltered master manifest the proxy serves,
+    /// so callers learn the variant heights from AVPlayer's own master request instead of
+    /// fetching the master a second time before creating the item.
+    let onManifestVariants: (@Sendable ([Int: URL]) -> Void)?
     private let lock = NSLock()
     private var activeTasks: [ObjectIdentifier: URLSessionDataTask] = [:]
 
@@ -73,7 +77,8 @@ final class YTHLSProxyLoader: NSObject, AVAssetResourceLoaderDelegate, @unchecke
         ua: String, nSolver: (unsolved: String, solved: String)? = nil,
         webViewCookies: [HTTPCookie] = [], selectedLanguageContentID: String? = nil,
         poToken: String? = nil, maximumVideoHeight: Int? = nil,
-        requiredVideoCodec: String? = nil
+        requiredVideoCodec: String? = nil,
+        onManifestVariants: (@Sendable ([Int: URL]) -> Void)? = nil
     ) {
         self.ua = ua
         self.nSolver = nSolver
@@ -82,6 +87,7 @@ final class YTHLSProxyLoader: NSObject, AVAssetResourceLoaderDelegate, @unchecke
         self.poToken = poToken
         self.maximumVideoHeight = maximumVideoHeight
         self.requiredVideoCodec = requiredVideoCodec
+        self.onManifestVariants = onManifestVariants
     }
 
     // MARK: AVAssetResourceLoaderDelegate
@@ -186,6 +192,10 @@ final class YTHLSProxyLoader: NSObject, AVAssetResourceLoaderDelegate, @unchecke
             var responseData = data
             if isPlaylist {
                 if let text = String(data: data, encoding: .utf8) {
+                    if let onManifestVariants = self.onManifestVariants, text.contains("#EXT-X-STREAM-INF") {
+                        onManifestVariants(
+                            parseHLSMasterManifest(text, baseURL: realURL.deletingLastPathComponent()))
+                    }
                     let rewritten = self.rewritePlaylist(text, baseURL: realURL)
                     responseData = rewritten.data(using: .utf8) ?? data
                 }

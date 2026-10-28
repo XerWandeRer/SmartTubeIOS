@@ -812,7 +812,9 @@ extension PlaybackViewModel {
             // HLS variant fetch is NOT on the critical path: we use the master URL for
             // initial playback, so AVPlayer does not need variant URLs to show the first
             // frame. Fetch in a background Task and update the quality picker when done.
-            if let hlsURL = info.hlsURL {
+            // VisionOS takes its variants from the master the HLS proxy serves to AVPlayer
+            // (see attemptURL), so it skips this extra master request.
+            if let hlsURL = info.hlsURL, !usedVisionOSPrimary {
                 Task { [weak self] in
                     let variantURLs = await self?.fetchHLSVariantURLs(url: hlsURL) ?? [:]
                     guard let self, !Task.isCancelled, !variantURLs.isEmpty else { return }
