@@ -148,9 +148,23 @@ extension InnerTubeAPI {
 
     /// Fetches player data using current yt-dlp's primary JS-less visionOS client.
     public func fetchPlayerInfoVisionOS(videoId: String) async throws -> PlayerInfo {
+        let reusedSession = visionOSVisitorData != nil
         await seedVisionOSSession(videoId: videoId)
+        do {
+            return try await requestPlayerInfoVisionOS(videoId: videoId)
+        } catch APIError.signInRequired where reusedSession {
+            // A stale reused session draws the same bot-check LOGIN_REQUIRED as no session:
+            // seed a fresh one and ask once more before giving up.
+            tubeLog.notice("VisionOS: LOGIN_REQUIRED with a reused session — reseeding once")
+            visionOSVisitorData = nil
+            await seedVisionOSSession(videoId: videoId)
+            return try await requestPlayerInfoVisionOS(videoId: videoId)
+        }
+    }
+
+    private func requestPlayerInfoVisionOS(videoId: String) async throws -> PlayerInfo {
         var clientFields = (visionOSClientContext["client"] as? [String: Any]) ?? [:]
-        if let vd = visitorData { clientFields["visitorData"] = vd }
+        if let vd = visionOSVisitorData ?? visitorData { clientFields["visitorData"] = vd }
         var body = makeBody(client: ["client": clientFields])
         body["videoId"] = videoId
         body["racyCheckOk"] = true

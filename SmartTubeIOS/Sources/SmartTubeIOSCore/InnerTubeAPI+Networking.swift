@@ -44,21 +44,69 @@ extension InnerTubeAPI {
     /// before its JS-less VisionOS player request. The watch-page response seeds
     /// youtube.com cookies and exposes visitorData required to avoid false
     /// `LOGIN_REQUIRED` bot-detection responses on otherwise public videos.
+    ///
+    /// The session is reused until the network path changes (`visionOSVisitorData`);
+    /// a load that finds a seed in flight (e.g. the launch-time prewarm) waits for it.
     func seedVisionOSSession(videoId: String) async {
-        var components = URLComponents(string: "https://www.youtube.com/watch")!
-        components.queryItems = [
-            URLQueryItem(name: "v", value: videoId),
-            URLQueryItem(name: "bpctr", value: "9999999999"),
-            URLQueryItem(name: "has_verified", value: "1"),
-        ]
+        let joinStart = Date()
+        var joined = false
+        if visionOSVisitorData == nil, let inFlight = visionOSSeedTask {
+            await inFlight.value
+            joined = true
+        }
+        if let cached = visionOSVisitorData {
+            visitorData = cached
+            #if DEBUG
+            let ms = Int(Date().timeIntervalSince(joinStart) * 1000)
+            let result = joined ? "joined" : "cached"
+            probeLog.notice(
+                "PROBE event=stage video=\(videoId, privacy: .public) stage=visitor_seed dur=\(ms, privacy: .public) result=\(result, privacy: .public)"
+            )
+            #endif
+            return
+        }
+        await runVisionOSSeed(videoId: videoId)
+    }
+
+    /// Seeds the VisionOS session in the background (app launch, network change) so the
+    /// first video load does not wait for the page. No-op when a session is cached or
+    /// a seed is already running.
+    public func prewarmVisionOSSession() async {
+        guard visionOSVisitorData == nil, visionOSSeedTask == nil else { return }
+        await runVisionOSSeed(videoId: nil)
+    }
+
+    private func runVisionOSSeed(videoId: String?) async {
+        let task = Task { await self.fetchVisionOSSession(videoId: videoId) }
+        visionOSSeedTask = task
+        await task.value
+        visionOSSeedTask = nil
+    }
+
+    /// `videoId == nil` (prewarm) loads the home page, which carries the same
+    /// visitorData in its ytcfg and is a third smaller than a watch page.
+    private func fetchVisionOSSession(videoId: String?) async {
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = "www.youtube.com"
+        components.path = "/"
+        if let videoId {
+            components.path = "/watch"
+            components.queryItems = [
+                URLQueryItem(name: "v", value: videoId),
+                URLQueryItem(name: "bpctr", value: "9999999999"),
+                URLQueryItem(name: "has_verified", value: "1"),
+            ]
+        }
         guard let url = components.url else { return }
         let seedStart = Date()
         var outcome = "failed"
         defer {
             #if DEBUG
             let ms = Int(Date().timeIntervalSince(seedStart) * 1000)
+            let source = videoId == nil ? "prewarm" : "watch"
             probeLog.notice(
-                "PROBE event=stage video=\(videoId, privacy: .public) stage=visitor_seed dur=\(ms, privacy: .public) result=\(outcome, privacy: .public)"
+                "PROBE event=stage video=\(videoId ?? "-", privacy: .public) stage=visitor_seed dur=\(ms, privacy: .public) result=\(outcome, privacy: .public) source=\(source, privacy: .public)"
             )
             #endif
         }
@@ -87,12 +135,13 @@ extension InnerTubeAPI {
 
         if let value = extractYouTubeVisitorData(from: html) {
             visitorData = value
+            visionOSVisitorData = value
             outcome = "seeded"
             tubeLog.notice("VisionOS session seeded (visitorData len=\(value.count, privacy: .public))")
             return
         }
         outcome = "missing"
-        tubeLog.notice("VisionOS session watch page loaded without visitorData")
+        tubeLog.notice("VisionOS session page loaded without visitorData")
     }
 
     // MARK: - signatureTimestamp fetch
@@ -394,7 +443,7 @@ extension InnerTubeAPI {
         request.setValue(InnerTubeClients.VisionOS.userAgent, forHTTPHeaderField: "User-Agent")
         request.setValue(InnerTubeClients.VisionOS.nameID, forHTTPHeaderField: "X-YouTube-Client-Name")
         request.setValue(InnerTubeClients.VisionOS.version, forHTTPHeaderField: "X-YouTube-Client-Version")
-        if let vd = visitorData {
+        if let vd = visionOSVisitorData ?? visitorData {
             request.setValue(vd, forHTTPHeaderField: "X-Goog-Visitor-Id")
         }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)

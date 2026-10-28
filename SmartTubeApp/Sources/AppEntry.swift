@@ -176,6 +176,8 @@ struct AppEntry: App {
                 .onOpenURL { url in handleOpenURL(url) }
                 .onChange(of: scenePhase, initial: true) { _, phase in
                     if phase == .active {
+                        // Seed the VisionOS session before any deep link starts a load.
+                        Task { await api.prewarmVisionOSSession() }
                         consumeQueueInjectFromLaunchArgs()
                         consumeDeepLinkFromLaunchArgs()
                         authService.handleForeground()
@@ -307,6 +309,8 @@ struct AppEntry: App {
                     #endif
                     .onChange(of: scenePhase, initial: true) { _, phase in
                         if phase == .active {
+                            // Seed the VisionOS session before any deep link starts a load.
+                            Task { await api.prewarmVisionOSSession() }
                             consumePendingVideoID()
                             consumePendingVideoFromLaunchArgs()
                             consumeDeepLinkFromLaunchArgs()

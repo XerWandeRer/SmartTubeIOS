@@ -24,6 +24,13 @@ public actor InnerTubeAPI {
 
     let session: URLSession
     var visitorData: String?
+    /// visitorData from the last VisionOS watch-page seed. Reused for every VisionOS player
+    /// request until the network path changes, so a video load does not refetch the ~1.4 MB
+    /// watch page only to read this one value. Kept apart from `visitorData`, which browse
+    /// and TV responses overwrite.
+    var visionOSVisitorData: String?
+    /// The seed in flight, so a video load joins the launch-time prewarm instead of racing it.
+    var visionOSSeedTask: Task<Void, Never>?
     var authToken: String?
     /// SAPISID cookie value from YouTube.com web session (set via OAuthLogin/MergeSession).
     /// Used by postWebCreator to compute SAPISIDHASH for WEB_CREATOR requests on www.youtube.com.
@@ -314,7 +321,9 @@ public actor InnerTubeAPI {
         lastPathStatus = path.status
         guard path.status == .satisfied, prev == .satisfied else { return }
         visitorData = nil
+        visionOSVisitorData = nil
         tubeLog.notice("visitorData cleared — network path changed (VPN/WiFi transition)")
+        Task { await prewarmVisionOSSession() }
     }
 
     // MARK: - Auth
@@ -344,6 +353,7 @@ public actor InnerTubeAPI {
     /// the next home-feed request uses YouTube's default shared recommendation algorithm.
     public func resetVisitorData() {
         visitorData = nil
+        visionOSVisitorData = nil
         tubeLog.notice("visitorData cleared (per-device recommendations disabled)")
     }
 }
