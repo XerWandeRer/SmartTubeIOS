@@ -628,20 +628,12 @@ extension PlaybackViewModel {
             }
 
             // --- Player info (stream URLs + metadata) ---
-            // Kick off an authenticated TV-client player request in parallel with the
-            // primary iOS player fetch when the cache doesn't already have tracking URLs.
             // cached.trackingURLs is PlaybackTrackingURLs?? — .some(nil) means the prefetch
-            // ran before auth was ready; treat that as a miss so we still get live URLs.
+            // ran before auth was ready; treat that as a miss so Phase 2 still asks for live,
+            // account-bound URLs. That request is not started here: tracking URLs are only
+            // needed for watch-history credit, so it runs in Phase 2 instead of competing
+            // with the player fetch and the first frame.
             let cachedTrackingURLs: PlaybackTrackingURLs? = cached.trackingURLs.flatMap { $0 }
-            let authTrackingTask: Task<PlaybackTrackingURLs?, Never>?
-            if cachedTrackingURLs != nil {
-                // Tracking URLs came from the cache; no need for a parallel TV-client call.
-                authTrackingTask = nil
-            } else {
-                authTrackingTask = Task<PlaybackTrackingURLs?, Never> { [api = self.api] in
-                    await api.fetchAuthenticatedTrackingURLs(videoId: video.id)
-                }
-            }
 
             // Fetch player info using the iOS client (unauthenticated).
             // If YouTube returns UNPLAYABLE/LOGIN_REQUIRED and the user is signed in,
@@ -1170,7 +1162,14 @@ extension PlaybackViewModel {
             let p2Cached = cached
             let p2Info = info
             let p2CachedTracking = cachedTrackingURLs
-            let p2AuthTask = authTrackingTask
+            // Authenticated web /player for account-bound tracking URLs, started only now
+            // (after the item is handed to AVPlayer) at utility priority.
+            let p2AuthTask: Task<PlaybackTrackingURLs?, Never>? =
+                cachedTrackingURLs != nil
+                ? nil
+                : Task(priority: .utility) { [api = self.api, videoId = video.id] in
+                    await api.fetchAuthenticatedTrackingURLs(videoId: videoId)
+                }
             let p2SponsorCached = sponsorCached
             let p2Video = video
             phase2Task = Task(priority: .utility) { [weak self] in
