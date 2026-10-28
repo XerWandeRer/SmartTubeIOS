@@ -17,6 +17,7 @@ keeps the signed-in state; every test run uses a throwaway clone of it.
 | `golden` / `golden-done` | Boot Golden with the GUI for the one-time device-code sign-in, then shut it down |
 | `play <id> [--client m]` | One probe on a fresh clone: result, client, itag, ms, screenshot |
 | `regress [--client m]` | Run `regress-list.tsv`, print a pass/fail table (Markdown report in `sim-out/`) |
+| `bench [--rounds n] [--list f]` | Startup timing per step from `PROBE event=stage` records, cold launches of `bench-list.tsv` (TSV report in `sim-out/`) |
 | `fixtures [--clients "…"]` | Record scrubbed `/player` responses per client for the offline tests |
 | `unit [Suite]` | Package unit tests on a fresh clone (`swift test` does not build on macOS) |
 | `up`, `open`, `logs`, `shot`, `record`, `ui`, `down` | Step-by-step control of one clone |

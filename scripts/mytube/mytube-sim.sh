@@ -333,6 +333,38 @@ cmd_regress() {
   ((fail == 0))
 }
 
+# bench [--list tsv] [--rounds n] [--timeout s] — startup timing per step. Every round
+# cold-launches each video of the list on one worker (round 1 is the app's first launch),
+# then summarises the PlaybackProbe stage records with bench-stages.py.
+cmd_bench() {
+  local timeout=60 list=${MYTUBE_BENCH_LIST:-$SRC/scripts/mytube/bench-list.tsv} rounds=3
+  while (($#)); do
+    case $1 in
+      --list) list=$2; shift 2 ;;
+      --rounds) rounds=$2; shift 2 ;;
+      --timeout) timeout=$2; shift 2 ;;
+      *) die "unknown option $1" ;;
+    esac
+  done
+  [[ -f $list ]] || die "no list at $list"
+  need_app
+  local w
+  w=$(worker_up) || exit 1
+  trap worker_down EXIT
+  xcrun simctl install $w $APP || die "install failed"
+  local report=$OUT/bench-$(date +%Y%m%d-%H%M%S).tsv r name vid
+  python3 -I $SRC/scripts/mytube/bench-stages.py --header > $report
+  for r in $(seq 1 $rounds); do
+    while IFS=$'\t' read -r name vid; do
+      [[ -z $name || $name == \#* ]] && continue
+      probe_one $w bench-r$r-$name $vid "" $timeout > /dev/null
+      python3 -I $SRC/scripts/mytube/bench-stages.py $OUT/bench-r$r-$name-$vid.log $vid r$r-$name >> $report
+    done < $list
+  done
+  column -t -s $'\t' $report
+  print "REPORT=$report"
+}
+
 # fixtures [--clients "m1 m2 …"] [--list f] [--timeout s] — records the raw /player
 # response of every client for every list entry (Debug build only), then copies the
 # scrubbed JSON files to $OUT/fixtures-<ts>/.
@@ -415,6 +447,7 @@ usage: mytube-sim.sh <command>
   play <id> [--client m] [--timeout s]     one probe on a throwaway worker
   regress [--client m] [--list f] [--timeout s]   run the regression list, print table
   fixtures [--clients "m …"] [--list f]   record scrubbed /player responses per client
+  bench [--list f] [--rounds n]            startup timing per step (cold launches)
   unit [Suite[/test]]        package unit tests on a throwaway worker
   status | reset
 client methods: ios ios-auth tvembedded tvauth websafari mweb android android-vr visionos
@@ -437,6 +470,7 @@ case $cmd in
   ui) cmd_ui "$@" ;;
   play) cmd_play "$@" ;;
   regress) cmd_regress "$@" ;;
+  bench) cmd_bench "$@" ;;
   fixtures) cmd_fixtures "$@" ;;
   unit) cmd_unit "$@" ;;
   status) cmd_status ;;
