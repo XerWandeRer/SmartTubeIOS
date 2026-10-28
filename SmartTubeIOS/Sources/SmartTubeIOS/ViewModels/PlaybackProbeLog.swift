@@ -18,6 +18,7 @@ import os
 ///   (`c=` / `itag=` query items or `/key/value` path pairs); for HLS manifests the
 ///   client comes from the response's format URLs and `itag` is `abr`.
 /// - `type`: `lastSuccessfulStreamType` of the winning load path.
+/// - `stage` records (`event=stage`) time the steps between `start` and `ready`.
 ///
 /// Release builds compile every call to a no-op.
 enum PlaybackProbeLog {
@@ -40,6 +41,19 @@ enum PlaybackProbeLog {
         if fields.client == "unknown" { fields.client = streamFields(infoURL).client }
         logger.notice(
             "PROBE event=ready video=\(videoId, privacy: .public) ms=\(elapsedMs, privacy: .public) client=\(fields.client, privacy: .public) itag=\(fields.itag, privacy: .public) kind=\(fields.kind, privacy: .public) type=\(streamType, privacy: .public)"
+        )
+        #endif
+    }
+
+    /// One step of the startup path, e.g. `stage=player`. `ms` is the time since `load()`
+    /// when the step finished; `dur` (when known) is the step's own duration. `detail` is
+    /// appended verbatim and must already be space-separated `key=value` pairs.
+    static func stage(_ name: String, videoId: String, elapsedMs: Int, durationMs: Int? = nil, detail: String = "") {
+        #if DEBUG
+        let dur = durationMs.map { " dur=\($0)" } ?? ""
+        let extra = detail.isEmpty ? "" : " \(detail)"
+        logger.notice(
+            "PROBE event=stage video=\(videoId, privacy: .public) stage=\(name, privacy: .public) ms=\(elapsedMs, privacy: .public)\(dur, privacy: .public)\(extra, privacy: .public)"
         )
         #endif
     }
@@ -90,5 +104,19 @@ enum PlaybackProbeLog {
         // HLS manifests always carry itag/0; the variant is chosen later by AVPlayer.
         let itag = kind == "hls" ? "abr" : (value("itag") ?? "none")
         return StreamFields(client: value("c") ?? "unknown", itag: itag, kind: kind)
+    }
+}
+
+extension PlaybackViewModel {
+    /// Logs a startup stage of `videoId`; `stepStart` is when the step began.
+    func probeStage(_ name: String, videoId: String, since stepStart: Date? = nil, detail: String = "") {
+        #if DEBUG
+        let now = Date()
+        PlaybackProbeLog.stage(
+            name, videoId: videoId,
+            elapsedMs: Int(now.timeIntervalSince(videoLoadStartedAt) * 1000),
+            durationMs: stepStart.map { Int(now.timeIntervalSince($0) * 1000) },
+            detail: detail)
+        #endif
     }
 }

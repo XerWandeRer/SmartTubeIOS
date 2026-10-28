@@ -1064,6 +1064,7 @@ extension PlaybackViewModel {
         if let hlsURL = info.hlsURL, url == hlsURL {
             let videoId = video.id
             let allVariantURLs: [Int: URL]
+            let masterFetchStart = Date()
             if hlsPolicy.filtersMasterManifest {
                 let fetched = await qualityManager.fetchHLSVariantURLs(
                     url: hlsURL, userAgent: hlsPolicy.userAgent
@@ -1088,6 +1089,9 @@ extension PlaybackViewModel {
                     PlaybackQualityManager.cacheHLSVariants(fetched, for: videoId)
                 }
             }
+            probeStage(
+                "master_parse", videoId: videoId, since: masterFetchStart,
+                detail: "label=\(label) variants=\(allVariantURLs.count)")
             let variantURLs =
                 hlsPolicy.maximumHeight.map { cap in
                     allVariantURLs.filter { $0.key <= cap }
@@ -1293,6 +1297,7 @@ extension PlaybackViewModel {
             return false
         }
         player.replaceCurrentItem(with: item)
+        probeStage("item", videoId: video.id, detail: "path=\(label)")
         itemObserverTask?.cancel()
 
         for await status in item.statusStream {

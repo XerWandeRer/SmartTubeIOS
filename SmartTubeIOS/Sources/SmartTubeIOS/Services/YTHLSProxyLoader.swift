@@ -11,6 +11,10 @@ import os.log
 
 private let proxyScheme = "ytwebhls"
 private let proxyLog = Logger(subsystem: "com.void.smarttube.app", category: "HLSProxy")
+#if DEBUG
+/// `PlaybackProbeLog` category: times each proxied request for scripted startup runs.
+private let probeLog = Logger(subsystem: appSubsystem, category: "PlaybackProbe")
+#endif
 
 // MARK: - URL scheme helpers
 
@@ -121,6 +125,7 @@ final class YTHLSProxyLoader: NSObject, AVAssetResourceLoaderDelegate, @unchecke
         proxyLog.notice("[HLSProxy] GET \(realURL.absoluteString.prefix(200))")
 
         let key = ObjectIdentifier(loadingRequest)
+        let requestStart = Date()
         let task = URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
             guard let self else { return }
             defer {
@@ -161,6 +166,21 @@ final class YTHLSProxyLoader: NSObject, AVAssetResourceLoaderDelegate, @unchecke
             proxyLog.notice(
                 "[HLSProxy] Content-Type=\(httpResp.value(forHTTPHeaderField: "Content-Type") ?? "nil") isPlaylist=\(isPlaylist)"
             )
+
+            #if DEBUG
+            let kind: String
+            if !isPlaylist {
+                kind = "segment"
+            } else if data.range(of: Data("#EXT-X-STREAM-INF".utf8)) != nil {
+                kind = "master"
+            } else {
+                kind = "playlist"
+            }
+            let durationMs = Int(Date().timeIntervalSince(requestStart) * 1000)
+            probeLog.notice(
+                "PROBE event=stage video=- stage=proxy_\(kind, privacy: .public) dur=\(durationMs, privacy: .public) http=\(httpResp.statusCode, privacy: .public) bytes=\(data.count, privacy: .public)"
+            )
+            #endif
 
             // For HLS playlists, rewrite segment/sub-playlist URIs to our proxy scheme.
             var responseData = data

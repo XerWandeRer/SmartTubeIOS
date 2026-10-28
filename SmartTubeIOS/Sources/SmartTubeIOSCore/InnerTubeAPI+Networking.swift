@@ -7,6 +7,8 @@ import FoundationNetworking
 #endif
 
 private let tubeLog = Logger(subsystem: appSubsystem, category: "InnerTube")
+/// Same category as the app's `PlaybackProbeLog`, so scripted runs see the session-seed step.
+private let probeLog = Logger(subsystem: appSubsystem, category: "PlaybackProbe")
 
 /// Extracts the visitor identifier embedded in a YouTube watch page.
 /// YouTube currently emits either the uppercase ytcfg key or lower-camel JSON key.
@@ -50,6 +52,16 @@ extension InnerTubeAPI {
             URLQueryItem(name: "has_verified", value: "1"),
         ]
         guard let url = components.url else { return }
+        let seedStart = Date()
+        var outcome = "failed"
+        defer {
+            #if DEBUG
+            let ms = Int(Date().timeIntervalSince(seedStart) * 1000)
+            probeLog.notice(
+                "PROBE event=stage video=\(videoId, privacy: .public) stage=visitor_seed dur=\(ms, privacy: .public) result=\(outcome, privacy: .public)"
+            )
+            #endif
+        }
 
         if let consentCookie = HTTPCookie(properties: [
             .domain: ".youtube.com",
@@ -75,9 +87,11 @@ extension InnerTubeAPI {
 
         if let value = extractYouTubeVisitorData(from: html) {
             visitorData = value
+            outcome = "seeded"
             tubeLog.notice("VisionOS session seeded (visitorData len=\(value.count, privacy: .public))")
             return
         }
+        outcome = "missing"
         tubeLog.notice("VisionOS session watch page loaded without visitorData")
     }
 

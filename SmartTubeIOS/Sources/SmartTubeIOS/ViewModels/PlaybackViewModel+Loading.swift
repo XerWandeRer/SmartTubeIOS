@@ -406,6 +406,7 @@ extension PlaybackViewModel {
         // thereafter (TTL ~12 h). The 2 s timeout is a safety net for slow networks only.
         let capturedAPI = api
         let capturedVideoId = video.id
+        let poTokenStart = Date()
         if !(await api.hasPoToken(for: video.id)) {
             await withTaskGroup(of: Void.self) { group in
                 group.addTask { await capturedAPI.prefetchPoToken(for: capturedVideoId) }
@@ -413,6 +414,10 @@ extension PlaybackViewModel {
                 _ = await group.next()
                 group.cancelAll()
             }
+            let gotToken = await api.hasPoToken(for: video.id)
+            probeStage("potoken", videoId: video.id, since: poTokenStart, detail: "waited=yes got=\(gotToken)")
+        } else {
+            probeStage("potoken", videoId: video.id, since: poTokenStart, detail: "waited=no got=true")
         }
         #if canImport(WebKit)
         // Fire-and-forget: start WKWebView BotGuard pipeline in the background.
@@ -594,6 +599,7 @@ extension PlaybackViewModel {
             // Check VideoPreloadCache for all data types. Fresh hits skip the network
             // call entirely; partial hits fill only the missing pieces in parallel.
             let cached = await VideoPreloadCache.shared.consume(videoId: video.id)
+            probeStage("cache", videoId: video.id, detail: "playerInfo=\(cached.playerInfo != nil)")
             // Log the full cache verdict as a single breadcrumb so wrong-video / prefetch-race
             // scenarios are immediately visible in Firebase reports.
             let cacheVerdict =
@@ -637,15 +643,18 @@ extension PlaybackViewModel {
             let info: PlayerInfo
             // Set when token-free VisionOS HLS is the primary source (see below).
             var usedVisionOSPrimary = false
+            let playerFetchStart = Date()
             if let cachedInfo = cached.playerInfo {
                 playerLog.notice(
                     "PREFETCH_HIT: playerInfo for \(video.id) — skipping network (hls=\(cachedInfo.hlsURL != nil) dash=\(cachedInfo.dashURL != nil) formats=\(cachedInfo.formats.count))"
                 )
+                probeStage("player", videoId: video.id, since: playerFetchStart, detail: "source=cache")
                 info = cachedInfo
             } else if let inFlight = await VideoPreloadCache.shared.inFlightPlayerFetch(videoId: video.id),
                 let coalescedInfo = await inFlight.value
             {
                 playerLog.notice("PREFETCH_COALESCE: playerInfo for \(video.id) — joined in-flight prefetch task")
+                probeStage("player", videoId: video.id, since: playerFetchStart, detail: "source=coalesced")
                 info = coalescedInfo
             } else if let visionInfo = try? await api.fetchPlayerInfoVisionOS(videoId: video.id),
                 visionInfo.hlsURL != nil
@@ -656,6 +665,7 @@ extension PlaybackViewModel {
                 // Not stored in VideoPreloadCache: a cache hit replays through the iOS HLS
                 // policy, which lacks VisionOS's H.264 filtering and Safari UA.
                 playerLog.notice("[VisionOS] primary: HLS available — skipping iOS/TV/Android chain")
+                probeStage("player", videoId: video.id, since: playerFetchStart, detail: "source=visionos")
                 usedVisionOSPrimary = true
                 info = visionInfo
             } else {
@@ -705,6 +715,7 @@ extension PlaybackViewModel {
                         throw error
                     }
                 }
+                probeStage("player", videoId: video.id, since: playerFetchStart, detail: "source=ios-chain")
                 await VideoPreloadCache.shared.store(playerInfo: info, for: video.id)
             }
             // BUG-005 fix: guard against rapid navigation — if the user navigated away while we
@@ -906,6 +917,7 @@ extension PlaybackViewModel {
             // where statusStream fires with stale state before the item is installed.
             // This matches the already-correct ordering in all fallback/audio-only paths.
             player.replaceCurrentItem(with: item)
+            probeStage("item", videoId: video.id, detail: "path=primary hls=\(isHLS)")
             duration = info.video.duration ?? 0
             itemObserverTask?.cancel()
             itemObserverTask = Task { [weak self] in
