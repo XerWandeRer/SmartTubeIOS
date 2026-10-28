@@ -400,6 +400,57 @@ cmd_bench() {
   print "REPORT=$report"
 }
 
+# bench-tap [--rounds n] [--warm secs] [--at "X Y"] — like bench --warm, but opens a video
+# by tapping a Home card (default: the first regular card under the Shorts shelf), so the
+# card prefetch path is measured. The video ID comes from the first PROBE start record.
+cmd_bench_tap() {
+  local rounds=5 warm=8 at="110 400" timeout=60
+  while (($#)); do
+    case $1 in
+      --rounds) rounds=$2; shift 2 ;;
+      --warm) warm=$2; shift 2 ;;
+      --at) at=$2; shift 2 ;;
+      *) die "unknown option $1" ;;
+    esac
+  done
+  need_app
+  local w
+  w=$(worker_up) || exit 1
+  trap worker_down EXIT
+  xcrun simctl install $w $APP || die "install failed"
+  local stamp=$(date +%Y%m%d-%H%M%S)
+  local report=$OUT/bench-tap$warm-$stamp.tsv r tag vid lpid t
+  python3 -I $SRC/scripts/mytube/bench-stages.py --header > $report
+  for r in $(seq 1 $rounds); do
+    tag=$OUT/benchtap-$stamp-r$r
+    xcrun simctl terminate $w $BUNDLE 2>/dev/null
+    xcrun simctl spawn $w log stream --level debug --style compact --predicate "$LOG_PREDICATE" > $tag.log 2>&1 &
+    lpid=$!
+    sleep 1
+    xcrun simctl launch $w $BUNDLE >/dev/null
+    sleep $warm
+    idb ui tap ${=at} --udid $w >/dev/null
+    vid=
+    for t in {1..20}; do
+      vid=$(grep -a -oE "PROBE event=start video=[^ ]+" $tag.log | head -1 | sed 's/.*video=//')
+      [[ -n $vid ]] && break
+      sleep 0.5
+    done
+    if [[ -z $vid ]]; then
+      note "round $r: the tap opened no video"
+    else
+      await_probe $tag.log $vid $timeout > /dev/null
+      sleep 2
+      xcrun simctl io $w screenshot $tag.png >/dev/null 2>&1
+      python3 -I $SRC/scripts/mytube/bench-stages.py $tag.log $vid r$r-tap >> $report
+    fi
+    kill $lpid 2>/dev/null
+    wait $lpid 2>/dev/null
+  done
+  column -t -s $'\t' $report
+  print "REPORT=$report"
+}
+
 # fixtures [--clients "m1 m2 …"] [--list f] [--timeout s] — records the raw /player
 # response of every client for every list entry (Debug build only), then copies the
 # scrubbed JSON files to $OUT/fixtures-<ts>/.
@@ -483,6 +534,7 @@ usage: mytube-sim.sh <command>
   regress [--client m] [--list f] [--timeout s]   run the regression list, print table
   fixtures [--clients "m …"] [--list f]   record scrubbed /player responses per client
   bench [--list f] [--rounds n] [--warm s] startup timing per step (cold or warm launches)
+  bench-tap [--rounds n] [--warm s] [--at "X Y"]  same, opening a video by tapping a Home card
   unit [Suite[/test]]        package unit tests on a throwaway worker
   status | reset
 client methods: ios ios-auth tvembedded tvauth websafari mweb android android-vr visionos
@@ -506,6 +558,7 @@ case $cmd in
   play) cmd_play "$@" ;;
   regress) cmd_regress "$@" ;;
   bench) cmd_bench "$@" ;;
+  bench-tap) cmd_bench_tap "$@" ;;
   fixtures) cmd_fixtures "$@" ;;
   unit) cmd_unit "$@" ;;
   status) cmd_status ;;
