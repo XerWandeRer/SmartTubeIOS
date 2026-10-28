@@ -154,38 +154,37 @@ struct AudioTrackSelectionTests {
         #expect(selected?.languageCode == "en")
     }
 
-    // MARK: - Task #54: Device language before DEFAULT=YES
+    // MARK: - XER-18: original before device language
 
-    /// Regression: Arabic is DEFAULT=YES in the HLS manifest (YouTube sets this dynamically),
-    /// but the device language is English — English should win (issue #24 / task #54).
-    @Test func deviceLanguagePrecedesHLSDefault_whenDefaultIsArabic() {
+    /// A Chinese video on an English-first device opens on its Chinese original, not the
+    /// English AI dub YouTube lists first.
+    @Test func originalPrecedesDeviceLanguage() {
         let tracks = [
-            track("ar", isOriginal: true),  // Arabic is DEFAULT=YES in HLS manifest
-            track("en", isOriginal: false),  // English available but not DEFAULT
+            track("en-US", isOriginal: false),  // AI dub, listed first
+            track("zh-Hant", isOriginal: true),  // creator's original
         ]
-        let selected = autoSelect(tracks: tracks, preferred: nil, deviceLanguages: ["en"])
-        #expect(selected?.languageCode == "en")
+        let selected = autoSelect(tracks: tracks, preferred: nil, deviceLanguages: ["en-CN", "zh-Hans-CN"])
+        #expect(selected?.languageCode == "zh-Hant")
     }
 
-    /// Arabic-locale device watching an Arabic-default video still gets Arabic.
-    @Test func arabicDevice_getsArabicTrack_viaDeviceLanguage() {
+    /// When no track is known to be original, the device language still decides.
+    @Test func deviceLanguageDecides_whenNoOriginalKnown() {
         let tracks = [
-            track("en", isOriginal: true),  // English is DEFAULT=YES
-            track("ar", isOriginal: false),  // Arabic dub
+            track("ar", isOriginal: false),
+            track("zh-Hans", isOriginal: false),
         ]
-        let selected = autoSelect(tracks: tracks, preferred: nil, deviceLanguages: ["ar"])
-        #expect(selected?.languageCode == "ar")
+        let selected = autoSelect(tracks: tracks, preferred: nil, deviceLanguages: ["zh-Hans-CN"])
+        #expect(selected?.languageCode == "zh-Hans")
     }
 
-    /// When device language has no matching track, DEFAULT=YES is used as fallback.
-    @Test func deviceLanguage_fallsBackToDefault_whenNoMatch() {
+    /// A saved language still beats the original.
+    @Test func savedLanguage_beatsOriginal() {
         let tracks = [
-            track("ar", isOriginal: true),  // Arabic DEFAULT=YES
-            track("en", isOriginal: false),  // English
+            track("en-US", isOriginal: false),
+            track("zh-Hant", isOriginal: true),
         ]
-        // Device is Japanese, no Japanese track → falls back to DEFAULT=YES (Arabic)
-        let selected = autoSelect(tracks: tracks, preferred: nil, deviceLanguages: ["ja"])
-        #expect(selected?.languageCode == "ar")
+        let selected = autoSelect(tracks: tracks, preferred: "en", deviceLanguages: ["zh-Hans-CN"])
+        #expect(selected?.languageCode == "en-US")
     }
 
     // MARK: - isMainProgramContent / Bug B regression tests

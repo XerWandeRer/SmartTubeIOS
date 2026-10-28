@@ -7,8 +7,8 @@ public let originalAudioLanguageSentinel = "original"
 
 /// Picks the audio rendition to start on when a video loads.
 ///
-/// Order: saved preference (or the "original" sentinel), then the device's preferred
-/// languages, then the HLS DEFAULT=YES original, then English, then the first track.
+/// Order: saved preference (or the "original" sentinel), then the creator's original,
+/// then the device's preferred languages, then English, then the first track.
 ///
 /// - Parameters:
 ///   - tracks: Renditions from the manifest, with `isOriginal` already resolved.
@@ -28,14 +28,15 @@ public func autoSelectAudioTrack(
         return tracks.first(where: { $0.languageCode.hasPrefix(base) })
             ?? tracks.first(where: \.isOriginal)
     }
-    // Device languages before DEFAULT=YES so a dubbed DEFAULT doesn't override the
-    // user's expected language (issue #54).
+    // The original before device languages: an AI dub in the device language must not
+    // replace the creator's audio. Upstream (#54) puts device languages first because
+    // DEFAULT=YES used to land on dubs; isOriginal now comes from acont=original.
+    if let original = tracks.first(where: \.isOriginal) { return original }
     for deviceLang in deviceLanguages {
         if let exact = tracks.first(where: { $0.languageCode == deviceLang }) { return exact }
         let base = deviceLang.components(separatedBy: "-").first ?? deviceLang
         if let match = tracks.first(where: { $0.languageCode.hasPrefix(base) }) { return match }
     }
-    if let original = tracks.first(where: \.isOriginal) { return original }
     let englishPrefixes = ["en-", "en_"]
     if let english = tracks.first(where: { $0.languageCode == "en" })
         ?? tracks.first(where: { track in
